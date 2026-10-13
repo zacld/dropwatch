@@ -80,7 +80,8 @@ if (cmd === 'ingest') {
   const db = createMonitorStore(join(config.dataDir, 'monitor.json')).data;
   const since = Date.now() - Number(opt('hours') ?? 48) * 3_600_000;
   const log = (db.request_log ?? []).filter(r => Date.parse(r.at) >= since);
-  console.log(`Release windows: ${config.releaseWindow.enabled ? 'ON' : 'off'} (offsets ${config.releaseWindow.offsetsMinutes.join(', ')} min; max ${config.releaseWindow.maxChecksPerRelease} per release; max ${config.releaseWindow.maxExtraPerSitePerHour} extra per site per hour)`);
+  const perSite = Object.entries(config.releaseWindow.offsetsBySource ?? {}).map(([s, o]) => `${s} ${o.join(', ')}`).join('; ');
+  console.log(`Release windows: ${config.releaseWindow.enabled ? 'ON' : 'off'} (offsets ${config.releaseWindow.offsetsMinutes.join(', ')} min${perSite ? `; per site: ${perSite}` : ''}; max ${config.releaseWindow.maxChecksPerRelease} per release; max ${config.releaseWindow.maxExtraPerSitePerHour} extra per site per hour)`);
   console.log(`\nRequests in the last ${opt('hours') ?? 48} h:`);
   const counts = {};
   for (const r of log) { const k = `${r.source} ${r.kind} ${r.requested ? 'sent' : r.outcome.split(':')[0]}`; counts[k] = (counts[k] ?? 0) + 1; }
