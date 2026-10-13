@@ -11,6 +11,9 @@
 //   node monitor/cli.js compare --source fatsoma --before a.html --after b.html [--url <page url>]
 //       Two snapshots of one event → detected changes → alerts, then the "after" snapshot again to show it
 //       sends nothing. Uses a throwaway in-memory store; your monitor data is not touched.
+//   node monitor/cli.js release-report [--hours 48]
+//       Read-only: requests made per site and kind, and each release window's checks, outcomes and how many
+//       minutes after the release the first change was detected. Safe while the monitor is running.
 import { loadDotEnv, loadConfig } from './config.js';
 import { createLogger } from './log.js';
 import { createMonitorApp } from './app.js';
@@ -19,13 +22,15 @@ import { connectorById } from './connectors/index.js';
 import { createMonitorStore } from './store.js';
 import { createEngine } from './engine.js';
 import { defaultPreferences } from './preferences.js';
+import { releaseReport } from './scheduler.js';
+import { join } from 'node:path';
 
 loadDotEnv();
 const [cmd, ...rest] = process.argv.slice(2);
 const opt = name => { const i = rest.indexOf(`--${name}`); return i >= 0 ? rest[i + 1] : undefined; };
 const config = loadConfig(process.env, { scheduler: { enabled: false, tickSeconds: 60 } });
 const log = createLogger({ level: config.logLevel, base: { svc: 'monitor-cli' }, sink: l => process.stderr.write(l + '\n') });
-const app = cmd === 'compare' ? null : createMonitorApp({ config, log });
+const app = ['compare', 'release-report'].includes(cmd) ? null : createMonitorApp({ config, log });
 const print = v => console.log(JSON.stringify(v, null, 2));
 const brief = r => ({
   observation: { id: r.observation.id, classification: r.observation.classification, status: r.observation.status, outcome: r.observation.outcome, events: r.observation.events, errors: r.observation.errors },
@@ -66,8 +71,26 @@ if (cmd === 'ingest') {
   await step('Snapshot 2 (after)', opt('after'));
   await step('Snapshot 2 again (duplicate check)', opt('after'));
   console.log(`\n${outbox.length} alert(s) in total; ${store.data.suppressed} suppressed as duplicates.`);
+} else if (cmd === 'release-report') {
+  // Read-only: loads the store but never saves it.
+  const db = createMonitorStore(join(config.dataDir, 'monitor.json')).data;
+  const since = Date.now() - Number(opt('hours') ?? 48) * 3_600_000;
+  const log = (db.request_log ?? []).filter(r => Date.parse(r.at) >= since);
+  console.log(`Release windows: ${config.releaseWindow.enabled ? 'ON' : 'off'} (offsets ${config.releaseWindow.offsetsMinutes.join(', ')} min; max ${config.releaseWindow.maxChecksPerRelease} per release; max ${config.releaseWindow.maxExtraPerSitePerHour} extra per site per hour)`);
+  console.log(`\nRequests in the last ${opt('hours') ?? 48} h:`);
+  const counts = {};
+  for (const r of log) { const k = `${r.source} ${r.kind} ${r.requested ? 'sent' : r.outcome.split(':')[0]}`; counts[k] = (counts[k] ?? 0) + 1; }
+  for (const [k, n] of Object.entries(counts)) console.log(`  ${k.padEnd(40)} ${n}`);
+  if (!log.length) console.log('  none');
+  const windows = releaseReport(log);
+  console.log(`\nRelease windows: ${windows.length}`);
+  for (const w of windows) {
+    const t = db.targets.find(x => x.id === w.target_id);
+    console.log(`\n  ${w.source} ${t?.target ?? w.target_id}\n  release ${w.release_at}  first change detected: ${w.first_change_minutes_after_release === null ? 'none' : `+${w.first_change_minutes_after_release} min`}`);
+    for (const s of w.slots) console.log(`    ${String(s.offset_minutes).padStart(4)} min  ${s.at}  ${s.requested ? 'sent   ' : 'no req '} ${s.outcome}${s.changes.length ? `  changes: ${s.changes.join(', ')}` : ''}${s.alerts ? `  alerts: ${s.alerts}` : ''}`);
+  }
 } else if (cmd === 'status') {
   print(app.engine.sourcesView().map(s => ({ source: s.source, state: s.state, enabled: s.enabled, live: s.live_retrieval, last_success_at: s.last_success_at, last_origin: s.last_origin, failures: s.consecutive_failures, paused_until: s.paused_until })));
 } else {
-  console.log('commands: ingest | fixture | fetch | status | compare   (see the top of monitor/cli.js)');
+  console.log('commands: ingest | fixture | fetch | status | compare | release-report   (see the top of monitor/cli.js)');
 }

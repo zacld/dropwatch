@@ -70,6 +70,35 @@ DROPWATCH_INTERVAL_FATSOMA_MINUTES=60     # 60 is the floor for public pages
 Pacing is per site, not per event: at most one request to Fatsoma per interval in total, so with three
 targets each event is checked about every three hours.
 
+## Release windows (faster alerts around known releases)
+
+With `DROPWATCH_RELEASE_WINDOW=on`, a watched event whose page publishes a release time (a tier's on-sale
+time, or the event's on-sale or presale time) gets a few extra checks around it: by default 2 minutes before,
+then 1, 5 and 15 minutes after. Everything else stays at one request per site per hour.
+
+Limits, all in `.env` and clamped to hard ceilings:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `DROPWATCH_RELEASE_OFFSETS_MINUTES` | `-2,1,5,15` | When to check, relative to the release |
+| `DROPWATCH_RELEASE_MAX_CHECKS` | 4 | Extra checks per release per event |
+| `DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR` | 4 | Extra requests per site in any rolling hour (site total: 1 + this) |
+| `DROPWATCH_RELEASE_SLOT_TOLERANCE_MINUTES` | 3 | A slot not run within this many minutes is logged as missed, not fired late |
+| `DROPWATCH_MIN_REQUEST_GAP_SECONDS` | 60 | Minimum gap between any two requests to a site |
+
+No extra checks run while a site is backing off or paused, and a release time is only used once Dropwatch has
+seen it on the page. Every request (normal and extra) is recorded in `request_log` in `monitor.json`.
+
+To see whether the extra checks make alerts faster:
+
+```
+node monitor/cli.js release-report --hours 48
+```
+
+It lists requests per site and kind, and for each release window the checks made, missed or skipped, and how
+many minutes after the release the first change was detected. It only reads, so it's safe while the monitor
+runs.
+
 ## Checking it is working
 
 - `GET http://127.0.0.1:4200/api/sources`: per-site state, last success, failures, pauses.

@@ -23,6 +23,21 @@ const num = (v, fallback) => (v === undefined || v === '' || !Number.isFinite(Nu
 // Minimum polling intervals. Configuration can lengthen these, never shorten them.
 export const MIN_INTERVAL_MINUTES = { official_api: 30, public_html: 60, fixture_only: Infinity };
 
+// Release-window checks: a few extra requests around a KNOWN release time of a watched event. Each setting is
+// clamped to a hard ceiling so configuration can tune the allowance but never turn it into heavy polling.
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+export function releaseWindowConfig(env = process.env) {
+  const offsets = String(env.DROPWATCH_RELEASE_OFFSETS_MINUTES ?? '-2,1,5,15')
+    .split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n >= -60 && n <= 120);
+  return {
+    enabled: flag(env.DROPWATCH_RELEASE_WINDOW, false),
+    offsetsMinutes: [...new Set(offsets.length ? offsets : [-2, 1, 5, 15])].sort((a, b) => a - b).slice(0, 8),
+    maxChecksPerRelease: clamp(num(env.DROPWATCH_RELEASE_MAX_CHECKS, 4), 0, 8),
+    maxExtraPerSitePerHour: clamp(num(env.DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR, 4), 0, 8),
+    slotToleranceMinutes: clamp(num(env.DROPWATCH_RELEASE_SLOT_TOLERANCE_MINUTES, 3), 1, 15),
+  };
+}
+
 export function loadConfig(env = process.env, overrides = {}) {
   const sources = {};
   for (const c of CONNECTORS) {
@@ -45,6 +60,9 @@ export function loadConfig(env = process.env, overrides = {}) {
     maxResponseBytes: num(env.DROPWATCH_MAX_RESPONSE_BYTES, 5_000_000),
     userAgent: env.DROPWATCH_USER_AGENT || `DropwatchMonitor/0.1 (+${env.DROPWATCH_CONTACT || 'contact not configured'})`,
     scheduler: { enabled: flag(env.DROPWATCH_SCHEDULER, false), tickSeconds: Math.max(30, num(env.DROPWATCH_SCHEDULER_TICK_SECONDS, 60)) },
+    // Never two requests to the same site closer than this, whatever the schedule (floor 30 s).
+    minRequestGapSeconds: Math.max(30, num(env.DROPWATCH_MIN_REQUEST_GAP_SECONDS, 60)),
+    releaseWindow: releaseWindowConfig(env),
     ticketmasterApiKey: env.TICKETMASTER_API_KEY || null,
     devRoutes: flag(env.DROPWATCH_DEV_ROUTES, false),
     logLevel: env.DROPWATCH_LOG_LEVEL || 'info',
