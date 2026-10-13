@@ -1,6 +1,6 @@
 # Plan: faster Fatsoma detection
 
-Status: **proposed, not started** (13 Oct 2026). Order agreed: (1) cover more per check, (2) check at the right
+Status: **Phase 1 built and tested** (13 Oct 2026); Phases 2–4 not started. Order agreed: (1) cover more per check, (2) check at the right
 moments, (4) test the email push, then (3) targeted bursts. Raising the baseline is a later decision, made only on
 evidence.
 
@@ -107,13 +107,31 @@ If the detection report shows drops arriving without any preceding signal, raise
 pages only (e.g. every 15 min, worst case ~17 min). Never faster than ~2 min (cache floor). This is a separate
 decision.
 
-## Open decisions
+## Decisions (13 Oct 2026)
 
-| Decision | Needed before |
+| Decision | Outcome |
 | --- | --- |
-| Burst budget (default proposal: up to 4 extra per hour per site, shared with release windows) | Phase 3 |
-| Alert delivery channel (Discord webhook, Telegram bot or ntfy push) so alerts reach a phone | Any live proof of alert speed |
-| Which organisers to watch | Phase 1 live run |
+| Pilot organiser | Riff Raff Events (Manchester), `https://www.fatsoma.com/p/riffraff` |
+| Manchester Halloween (`w12de4k1`) | Keeps its own event-page watch until it appears in the organiser page's 12-event window (the coverage rule then pauses it) |
+| Burst budget | Up to **4 additional checks per hour per site in total**, shared between release windows and signal bursts (not 4 + 4). Back-off, pause and minimum-spacing safeguards unchanged |
+| Alert delivery | In-app notifications for now; no external channel yet |
+
+## Phase 1 as built
+
+- Listing mode in `connectors/fatsoma.js`: organiser pages parse into one event per listed event; another event's
+  tiers in the shared `included` list are skipped, not quarantined; empty JSON-LD placeholders are ignored.
+- Targets carry a kind (`event` / `organiser`); anything else is rejected for Fatsoma.
+- The first successful check of a new watch is a **baseline**: events already listed are recorded without
+  "new event" alerts; events that appear later are announced.
+- Coverage rule: an event-page watch is skipped while an organiser watch's latest check listed its event, and
+  resumes if it drops out.
+- Release windows apply to every event an organiser watch lists.
+- `X-Cache-Status` is recorded in the request log.
+- **Scheduler fix found by these tests:** with one request per hour per site, the scheduler always gave the slot to
+  the first due target, so later targets on the same site were never checked. The most overdue target now goes
+  first, so watches rotate fairly.
+- Tests: `test/monitor-organiser.test.js` (real organiser page plus derived v2/v3 fixtures); each new rule has a
+  test that fails without it.
 
 ## Proof of the whole chain (Phase 1 exit criterion, unchanged)
 

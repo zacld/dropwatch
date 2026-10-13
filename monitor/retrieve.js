@@ -47,7 +47,7 @@ export async function retrieveLive(connector, target, config, { fetchImpl = fetc
     }
     const text = await readLimited(res, config.maxResponseBytes);
     const headers = {};
-    for (const h of ['content-type', 'retry-after', 'date', 'age', 'cache-control', 'etag', 'last-modified', 'x-cache']) headers[h] = res.headers.get(h);
+    for (const h of ['content-type', 'retry-after', 'date', 'age', 'cache-control', 'etag', 'last-modified', 'x-cache', 'x-cache-status']) headers[h] = res.headers.get(h);
     const observedAt = new Date(now()).toISOString();
     return { ...base, observed_at: observedAt, content_as_of: contentAsOf(headers, observedAt), status: res.status, headers, body: text };
   } catch (e) {

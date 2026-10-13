@@ -36,8 +36,15 @@ export const fatsoma = defineConnector({
   defaultTimezone: 'Europe/London',
   defaultCurrency: 'GBP',
   access: { method: 'public_html', liveRetrieval: 'not_assessed', requiresConfig: [], notes: 'Initial-HTML JSON-LD and FastBoot shoebox state only.' },
-  verification: 'one real saved page (13 Oct 2026) plus synthetic fixtures',
-  expectedContent: body => Object.values(shoebox(body).entries).some(e => e?.data?.type === 'events') || jsonLd(body).nodes.some(isEventNode),
+  verification: 'real saved event and organiser pages (13 Oct 2026) plus synthetic fixtures',
+  // Watchable pages: an event page (/e/<id>/...) or an organiser page (/p/<slug>), which lists its 12 soonest events.
+  targetKind(url) {
+    const path = new URL(url).pathname;
+    if (/^\/e\/[a-z0-9]+(\/|$)/i.test(path)) return 'event';
+    if (/^\/p\/[^/]+\/?$/i.test(path)) return 'organiser';
+    throw new Error('Fatsoma targets must be an event page (/e/...) or an organiser page (/p/...)');
+  },
+  expectedContent: body => Object.values(shoebox(body).entries).some(e => e?.data?.type === 'events' || (Array.isArray(e?.data) && e.data.some(x => x?.type === 'events'))) || jsonLd(body).nodes.some(isEventNode),
 
   parse(body, { observation }) {
     const anomalies = [];
@@ -48,11 +55,34 @@ export const fatsoma = defineConnector({
     errors.push(...ld.errors);
     const canonical = canonicalUrl(body) ?? observation?.target ?? null;
 
+    // Event page: exactly one event document. Organiser (listing) page: event collections, each event with its
+    // own tiers in the shared `included` list (observed 13 Oct 2026 on /p/riffraff: 12 events, 62 tiers).
     const docs = Object.values(sb.entries).filter(d => d?.data?.type === 'events' && d.data.id);
-    if (docs.length !== 1) {
-      return { events: [], anomalies, errors: [...errors, docs.length ? 'more than one event document in state' : 'no event document in FastBoot state'] };
+    if (docs.length > 1) return { events: [], anomalies, errors: [...errors, 'more than one event document in state'] };
+    if (docs.length === 1) {
+      const one = parseEventDoc({ data: docs[0].data, included: docs[0].included ?? [] }, { canonical, ld, anomalies });
+      return { events: [one], anomalies, errors };
     }
-    const doc = docs[0];
+    const lists = Object.values(sb.entries).filter(d => Array.isArray(d?.data) && d.data.some(x => x?.type === 'events'));
+    if (!lists.length) return { events: [], anomalies, errors: [...errors, 'no event document in FastBoot state'] };
+    const seen = new Set();
+    const events = [];
+    for (const list of lists) {
+      for (const data of list.data.filter(x => x?.type === 'events' && x.id)) {
+        if (seen.has(String(data.id))) continue;
+        seen.add(String(data.id));
+        const at = data.attributes ?? {};
+        const url = at['vanity-name'] ? `https://www.fatsoma.com/e/${at['vanity-name']}/${at['seo-name'] ?? ''}`.replace(/\/$/, '') : null;
+        events.push(parseEventDoc({ data, included: list.included ?? [] }, { canonical: url, ld: null, anomalies }));
+      }
+    }
+    return { events, anomalies, errors, listing: { events: events.length, total: lists[0].meta?.['total-count'] ?? null } };
+  },
+});
+
+// One event (its JSON:API resource and the document's `included` list) → RawEvent. `ld` is the page's JSON-LD on
+// an event page, or null on a listing (where the JSON-LD does not describe this event).
+function parseEventDoc(doc, { canonical, ld, anomalies }) {
     const eventId = String(doc.data.id);
     const a = doc.data.attributes ?? {};
     const included = doc.included ?? [];
@@ -105,6 +135,9 @@ export const fatsoma = defineConnector({
       if (ta.visible === false) continue; // hidden by the promoter; not shown on the page
       const owner = ta['event-id'] ?? t.relationships?.event?.data?.id;
       const listed = claimed.has(String(t.id));
+      // On a listing, `included` holds every listed event's tiers: another event's own tier is not ours and not
+      // an anomaly. A tier this event claims but which names another event is still quarantined.
+      if (!ld && !listed && owner !== undefined && String(owner) !== eventId) continue;
       let reason = null;
       if (owner !== undefined && String(owner) !== eventId) reason = `tier names event ${owner}, not ${eventId}${listed ? ' (although this event lists it)' : ''}`;
       else if (!listed && owner === undefined) reason = 'tier is not listed by this event and carries no event id';
@@ -129,8 +162,9 @@ export const fatsoma = defineConnector({
     for (const id of claimed) if (!included.some(i => String(i.id) === id && TIER_TYPES.has(i.type))) warnings.push(`event lists tier ${id} but its data is not on the page`);
 
     // JSON-LD offers that point at a different event page are the observed mis-association; record them.
-    const node = ld.nodes.filter(isEventNode).find(n => !n.url || sameEvent(n.url, canonical)) ?? null;
-    for (const n of ld.nodes.filter(isEventNode)) {
+    const ldEvents = ld ? ld.nodes.filter(isEventNode) : [];
+    const node = ldEvents.find(n => !n.url || sameEvent(n.url, canonical)) ?? null;
+    for (const n of ldEvents) {
       for (const o of [].concat(n.offers ?? []).flatMap(o => [o, ...[].concat(o?.offers ?? [])])) {
         if (o?.url && canonical && !sameEvent(o.url, canonical)) {
           quarantined.push({ tier: { source_tier_id: `jsonld:${o.url}`, name: o.name ?? 'Offer', price: null, currency: o.priceCurrency ?? null, release_at: null, status: 'unknown', provenance: 'json-ld' }, reason: `JSON-LD offer links to another event (${o.url})` });
@@ -186,9 +220,8 @@ export const fatsoma = defineConnector({
         warnings.push(`JSON-LD eventStatus says ${ldStatus}; page state says ${fields.cancellation_status} (state used)`);
       }
     }
-    return { events: [{ fields, provenance, tiers, quarantined, warnings, unavailable: [], confidence }], anomalies, errors };
-  },
-});
+    return { fields, provenance, tiers, quarantined, warnings, unavailable: [], confidence };
+}
 
 function sameEvent(a, b) {
   try {

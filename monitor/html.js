@@ -25,6 +25,7 @@ export function jsonLd(html) {
   const nodes = [];
   const errors = [];
   scripts(html).filter(s => (s.attrs.type ?? '').toLowerCase() === 'application/ld+json').forEach((s, i) => {
+    if (!s.text.trim()) return; // empty placeholder (Fatsoma organiser pages render 12 of them): nothing to parse
     const { value, error } = tryJson(s.text);
     if (error) { errors.push(`json-ld block ${i}: ${error}`); return; }
     const walk = v => {

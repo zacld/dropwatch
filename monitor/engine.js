@@ -133,7 +133,10 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
       const allDiffs = prev ? [...diffs, ...tierDiffs] : [{ field: '*', kind: 'new_event', previous: null, current: { title: record.title, start_at: record.start_at } }];
       for (const d of allDiffs) {
         const fieldState = d.field in (ev.field_states ?? {}) ? ev.field_states[d.field] : null;
-        const el = eligibility(d, { confidence: ev.confidence, minConfidence: config.minAlertConfidence, staleOnArrival, fieldState });
+        let el = eligibility(d, { confidence: ev.confidence, minConfidence: config.minAlertConfidence, staleOnArrival, fieldState });
+        // The first check of a newly added watch (e.g. an organiser page listing 12 events) records what is
+        // already there; only events that appear after it are announced as new.
+        if (observation.baseline && d.kind === 'new_event' && el.eligible) el = { eligible: false, reason: 'baseline: first check of a newly added watch' };
         newChanges.push({
           id: store.nextId('chg'),
           event_id: id,

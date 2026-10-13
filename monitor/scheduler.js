@@ -30,7 +30,8 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     if (!c) throw new Error(`unknown source ${source}`);
     const floor = MIN_INTERVAL_MINUTES[c.access.method] ?? 60;
     if (!Number.isFinite(floor)) throw new Error(`${c.name} has no permitted live access method`);
-    const t = { id: store.nextId('tgt'), source, target: String(target), interval_minutes: Math.max(floor, Number(interval_minutes) || config.sources[source].intervalMinutes), enabled: true, last_run_at: null, last_result: null };
+    const kind = c.targetKind ? c.targetKind(String(target)) : 'event';
+    const t = { id: store.nextId('tgt'), source, target: String(target), kind, interval_minutes: Math.max(floor, Number(interval_minutes) || config.sources[source].intervalMinutes), enabled: true, last_run_at: null, last_result: null };
     db.targets.push(t);
     store.save();
     return t;
@@ -44,9 +45,23 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
   const gapOk = (source, t) => t - lastRequestAt(source) >= minGap;
   const record = entry => { db.request_log.push(entry); log?.info('request', entry); };
 
-  // ---- release times known for a target's event ----
+  // ---- the events a target shows ----
   function eventFor(target) {
-    return Object.values(db.events).find(e => e.source === target.source && (e.source_metadata?.target === target.target || samePage(e.canonical_url, target.target))) ?? null;
+    return Object.values(db.events).find(e => e.source === target.source && (samePage(e.canonical_url, target.target) || e.source_metadata?.target === target.target)) ?? null;
+  }
+  // An organiser (listing) target shows the events its last check listed; an event target shows its event.
+  function eventsFor(target) {
+    if (target.kind === 'organiser') return (target.covers ?? []).map(id => db.events[id]).filter(Boolean);
+    const ev = eventFor(target);
+    return ev ? [ev] : [];
+  }
+  // An event-page target is redundant while an enabled organiser target's latest check listed its event.
+  // It resumes on its own if the event drops out of the listing.
+  function coveredBy(target) {
+    if (target.kind === 'organiser') return null;
+    const ev = eventFor(target);
+    if (!ev) return null;
+    return db.targets.find(o => o.enabled && o.kind === 'organiser' && o.source === target.source && (o.covers ?? []).includes(ev.id)) ?? null;
   }
   function releaseTimes(ev) {
     const times = new Set();
@@ -57,13 +72,15 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
 
   // The earliest release slot that is due now for this target, or null. Marks slots that were missed.
   function dueSlot(target, t) {
-    const ev = eventFor(target);
-    if (!ev) return null;
+    const events = eventsFor(target);
+    if (!events.length) return null;
     target.release_checks ??= {};
     for (const k of Object.keys(target.release_checks)) if (Date.parse(k.split('|')[0]) < t - 2 * 24 * HOUR) delete target.release_checks[k];
-    const known = Date.parse(ev.first_seen_at ?? iso(t));
+    // Each release time, with when its event was first seen (a release already past then is not a missed slot).
+    const known = new Map();
+    for (const ev of events) for (const R of releaseTimes(ev)) known.set(R, Math.min(known.get(R) ?? Infinity, Date.parse(ev.first_seen_at ?? iso(t))));
     let best = null;
-    for (const R of releaseTimes(ev)) {
+    for (const [R, firstSeen] of known) {
       const r = Date.parse(R);
       if (r < t - 24 * HOUR || r > t + 24 * HOUR) continue;
       const done = Object.entries(target.release_checks).filter(([k, v]) => k.startsWith(`${R}|`) && v.requested).length;
@@ -71,7 +88,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
         const at = r + off * MIN;
         const key = `${R}|${off}`;
         if (target.release_checks[key] || t < at) continue;
-        if (at < known) continue; // the release was already past when we first saw the event
+        if (at < firstSeen) continue; // the release was already past when we first saw the event
         if (t - at > rw.slotToleranceMinutes * MIN) {
           target.release_checks[key] = { outcome: 'missed', at: iso(t) };
           record({ at: iso(t), source: target.source, target_id: target.id, kind: 'release_window', release_at: R, offset_minutes: off, requested: false, outcome: `missed: slot was due ${Math.round((t - at) / MIN)} min earlier` });
@@ -94,10 +111,11 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     if (meta.kind === 'scheduled') target.last_run_at = iso(t0);
     const obs = await retrieveLive(c, target.target, config, { fetchImpl, now, log });
     const entry = {
-      at: iso(t0), source: target.source, target_id: target.id, kind: meta.kind,
+      at: iso(t0), source: target.source, target_id: target.id, target_kind: target.kind ?? 'event', kind: meta.kind,
       release_at: meta.R ?? null, offset_minutes: meta.off ?? null,
       minutes_after_release: meta.R ? Math.round((t0 - Date.parse(meta.R)) / 6000) / 10 : null,
       requested: !obs.refused,
+      cache_status: obs.headers?.['x-cache-status'] ?? obs.headers?.['x-cache'] ?? null,
     };
     if (obs.refused) {
       entry.outcome = `refused: ${obs.refused}`;
@@ -107,7 +125,12 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
       store.save();
       return { ran: target.id, kind: meta.kind, refused: obs.refused };
     }
-    const r = await engine.ingest(obs);
+    // The first successful check of a newly added watch is its baseline: what is already listed is not "new".
+    const r = await engine.ingest({ ...obs, baseline: !target.baseline_at });
+    if (r.observation.status === 'valid') {
+      target.baseline_at ??= entry.at;
+      if (target.kind === 'organiser') { target.covers = r.events.map(e => e.id); target.covers_at = entry.at; }
+    }
     Object.assign(entry, {
       http_status: obs.status ?? null,
       outcome: `${r.observation.classification}/${r.observation.status}`,
@@ -133,7 +156,12 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
   async function runOne() {
     const t = now();
     const live = db.targets.filter(x => x.enabled).map(target => ({ target, c: connectorById(target.source), src: config.sources[target.source] }))
-      .filter(x => x.c && x.src?.enabled && x.src.live);
+      .filter(x => x.c && x.src?.enabled && x.src.live)
+      .filter(({ target }) => {
+        const by = coveredBy(target);
+        if (by) target.last_result = `covered by organiser page ${by.id}; not checked separately`;
+        return !by;
+      });
 
     // 1. Release-window checks: only for events with a known release time; never while backing off.
     if (rw.enabled) {
@@ -154,11 +182,14 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
       if (wait) return { ran: null, reason: wait };
     }
 
-    // 2. Normal monitoring: unchanged rules, plus the hard site budget and minimum gap.
-    for (const { target, c, src } of live) {
+    // 2. Normal monitoring: unchanged rules, plus the hard site budget and minimum gap. When several targets on
+    // one site are due, the most overdue goes first (never-checked targets first, then in list order), so a
+    // site's single hourly slot rotates fairly instead of always going to the first target in the list.
+    const dueAt = target => (target.last_run_at ? Date.parse(target.last_run_at) : 0) + target.interval_minutes * MIN;
+    const due = live.filter(({ target }) => t >= dueAt(target)).sort((a, b) => dueAt(a.target) - dueAt(b.target));
+    for (const { target, c, src } of due) {
       const h = db.sources[target.source];
-      const due = (target.last_run_at ? Date.parse(target.last_run_at) : 0) + target.interval_minutes * MIN;
-      if (t < due || t < nextAllowedAttempt(h, src.intervalMinutes)) continue;
+      if (t < nextAllowedAttempt(h, src.intervalMinutes)) continue;
       if (inLastHour(target.source, t) >= siteCap() || !gapOk(target.source, t)) continue;
       return request(target, c, { kind: 'scheduled' });
     }

@@ -70,6 +70,21 @@ DROPWATCH_INTERVAL_FATSOMA_MINUTES=60     # 60 is the floor for public pages
 Pacing is per site, not per event: at most one request to Fatsoma per interval in total, so with three
 targets each event is checked about every three hours.
 
+## Watching organiser pages (Fatsoma)
+
+A Fatsoma organiser page (`https://www.fatsoma.com/p/<organiser>`) lists that organiser's 12 soonest events with
+every ticket tier, so one check covers up to 12 events. Add it like any target:
+
+```
+curl -X POST http://127.0.0.1:4200/api/targets -H "content-type: application/json" -d "{\"source\":\"fatsoma\",\"target\":\"https://www.fatsoma.com/p/riffraff\",\"interval_minutes\":60}"
+```
+
+- The first check is a baseline: what is already listed is recorded without "new event" alerts.
+- An event watched on its own page is not checked separately while the organiser page lists it.
+- An event that drops off the list (ended, or pushed out of the 12) is left as it was, never treated as
+  cancelled or sold out.
+- All watches on one site share its hourly slot in rotation, most overdue first.
+
 ## Release windows (faster alerts around known releases)
 
 With `DROPWATCH_RELEASE_WINDOW=on`, a watched event whose page publishes a release time (a tier's on-sale
