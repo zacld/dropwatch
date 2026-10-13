@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ticket Source Map · Dropwatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --bg:#f4f2f8; --surface:#fff; --surface-2:#eeebf5; --line:#dcd7e8; --ink:#191529; --ink-2:#5a5470; --ink-3:#857f99;
+  --dusk:#34287a; --dusk-soft:#e6e1f7; --accent:#e04a33; --ok:#1b7f55; --ok-soft:#ddf1e7; --warn:#a45f00; --warn-soft:#faecd4; --bad:#b0302a; --bad-soft:#f7dddb;
+  --display:"Unbounded",system-ui,sans-serif; --body:"Manrope",system-ui,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;
+  --bg:#110e1f; --surface:#1a162d; --surface-2:#231e3b; --line:#312a51; --ink:#efecf9; --ink-2:#aaa3c6; --ink-3:#7f789c;
+  --dusk:#b9abff; --dusk-soft:#28214d; --accent:#ff7558; --ok:#5fd39b; --ok-soft:#14301f; --warn:#f2b552; --warn-soft:#33280f; --bad:#ff8a80; --bad-soft:#3a1b1e;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);padding:0 16px 56px}
+.wrap{max-width:1120px;margin:0 auto}
+h1,h2{font-family:var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:26px} h2{font-size:17px;margin-bottom:12px}
+header{padding:28px 0 18px;display:grid;gap:8px}
+.k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--ink-2)}
+.lead{font-size:16px;max-width:72ch;color:var(--ink-2);margin:0}
+.lead b{color:var(--ink)}
+section{margin-top:28px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.grid2{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:120px 1fr 28px;gap:10px;align-items:center;font-size:13.5px}
+.track{height:18px;background:var(--surface-2);border-radius:6px;overflow:hidden;display:flex}
+.fill{background:var(--dusk);height:100%}
+.fill.rep{background:repeating-linear-gradient(135deg,var(--dusk) 0 4px,transparent 4px 8px);opacity:.55}
+.bar .n{font-family:var(--mono);font-weight:600;text-align:right}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink-2);margin-top:10px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:6px;background:var(--dusk)}
+.sw.rep{background:repeating-linear-gradient(135deg,var(--dusk) 0 3px,transparent 3px 6px);opacity:.55}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px}
+th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+td b{font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--dusk-soft);color:var(--dusk);white-space:nowrap}
+.chip.rep{background:transparent;border:1px dashed var(--line);color:var(--ink-2)}
+.src{font-size:12px;color:var(--ink-2)}
+a{color:var(--dusk);font-weight:700}
+.st{font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.st.no{background:var(--bad-soft);color:var(--bad)}
+.st.ask{background:var(--warn-soft);color:var(--warn)}
+.st.open{background:var(--ok-soft);color:var(--ok)}
+.st.unk{background:var(--surface-2);color:var(--ink-2)}
+ol.plan{margin:0;padding-left:22px;display:grid;gap:10px}
+ol.plan li b{font-weight:800}
+.note{font-size:12.5px;color:var(--ink-2);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="k">Dropwatch research · 5 Oct 2026</div>
+    <h1>Ticket Source Map</h1>
+    <div><a href="/skiddle.html">Skiddle buying architecture →</a></div>
+    <p class="lead">Where your 12 priority venues and series actually sell tickets, and what each platform allows. <b>Club websites rarely run their own ticketing:</b> their buy buttons lead to ten different outlets, and Ticketmaster is only one of them.</p>
+  </header>
+
+  <section class="grid2">
+    <div class="panel">
+      <h2>Venues and series each platform sells for</h2>
+      <div class="bars" id="bars"></div>
+      <div class="legend"><span><span class="sw"></span>Confirmed on an official page or the Ticketmaster API</span><span><span class="sw rep"></span>Reported in search results only</span></div>
+    </div>
+    <div class="panel">
+      <h2>What it means</h2>
+      <ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px">
+        <li><b>Ticketmaster is the widest single source</b> (7 of 12), but it's also the hardest to get permission from.</li>
+        <li><b>Most UK series sell through several outlets at once.</b> Parklife names 7 official outlets and Worried About Henry offers 4. The same tickets can often be bought somewhere more open than Ticketmaster.</li>
+        <li><b>Skiddle, Kaboodle and Resident Advisor</b> each cover 2–4 venues or series. Skiddle's published terms don't mention automated buying, and it runs an API, an affiliate scheme and promoter tools.</li>
+        <li><b>Ibiza is fragmented:</b> DC10 sells on DICE, Amnesia on CM.com, UNVRS on its own site.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where each venue and series sells</h2>
+    <div class="panel scroll"><table id="venues"><thead><tr><th>Venue or series</th><th>Sells through</th><th>Evidence</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">Solid chips were confirmed on the venue's or promoter's own page, or through the Ticketmaster Discovery API. Dashed chips come from search results and still need checking.</p>
+  </section>
+
+  <section>
+    <h2>What each platform allows</h2>
+    <div class="panel scroll"><table id="platforms"><thead><tr><th>Platform</th><th>Automated buying</th><th>Official routes</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">"No clause found" is not permission. Dropwatch is a commercial service, so every platform still needs written approval before automated checkout goes live.</p>
+  </section>
+
+  <section>
+    <h2>Recommended order</h2>
+    <div class="panel">
+      <ol class="plan">
+        <li><b>Skiddle first.</b> It's the most open-looking: no automated-buying clause in its published terms, an API (commercial use by written approval from dev@skiddle.com), an affiliate scheme and promoter tools. It sells for Parklife and Worried About Henry, and reportedly for The Warehouse Project and Teletech. Ask for commercial API approval and whether customer-authorised checkout could be supported.</li>
+        <li><b>The Warehouse Project family as a promoter partner.</b> WHP runs or co-runs You&amp;Me, Steel City Dance Discs, Teletech London and WAH x WHP. One promoter relationship covers several of your priority nights, whichever platform they sell on.</li>
+        <li><b>Kaboodle</b> for Drumsheds, Worried About Henry and Parklife. Its website terms have no automated-buying clause, but its full agent terms haven't been read yet.</li>
+        <li><b>Resident Advisor</b> for fabric. Its terms ban unauthorised automated access, so written authorisation is the only route.</li>
+        <li><b>Ticketmaster</b> stays the long-term target (7 of 12), pursued through its developer programme in parallel.</li>
+        <li><b>Ibiza later.</b> DICE, CM.com and UNVRS's own checkout are three separate integrations for one season.</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<script>
+const VENUES = [
+  { name: 'The Warehouse Project', where: 'Depot Mayfield, Manchester', confirmed: ['Ticketmaster'], reported: ['Skiddle'],
+    evidence: [['Ticketmaster Discovery API: 25 listings', null], ['Presale sign-up via drop.cobrand.com', 'https://www.thewarehouseproject.com']] },
+  { name: 'Parklife', where: 'Heaton Park, Manchester', confirmed: ['Ticketmaster', 'See Tickets', 'Skiddle', 'Kaboodle', 'Resident Advisor', 'Fatsoma'], reported: [],
+    evidence: [['Official outlets named on parklife.uk.com/tickets', 'https://parklife.uk.com/tickets/']] },
+  { name: 'You&Me', where: 'Depot Mayfield, Manchester', confirmed: ['Ticketmaster'], reported: ['Skiddle'],
+    evidence: [['Ticketmaster Discovery API: 2 listings (2–3 Oct 2026)', null]] },
+  { name: 'Steel City Dance Discs', where: "KETTAMA's series, Depot Mayfield", confirmed: ['Ticketmaster'], reported: [],
+    evidence: [['Ticketmaster Discovery API: 6 Nov 2026 show', null]] },
+  { name: 'Solid Grooves / DC10', where: 'DC10, Ibiza', confirmed: ['DICE'], reported: ['Ibiza resellers'],
+    evidence: [['dc10ibiza.com ticket links go to dice.fm', 'https://dc10ibiza.com/en/']] },
+  { name: 'Paradise / UNVRS', where: 'UNVRS, Ibiza', confirmed: ['Own site'], reported: ['Clubtickets'],
+    evidence: [['Buy buttons on unvrs.com (provider not identified)', 'https://www.unvrs.com/events/2026/jamie-jones-paradise']] },
+  { name: 'Teletech', where: 'DRUMSHEDS, London', confirmed: ['Kaboodle'], reported: ['Skiddle', 'Resident Advisor'],
+    evidence: [['drumshedslondon.com ticket link goes to kaboodle.com', 'https://drumshedslondon.com/event/teletech/']] },
+  { name: 'Worried About Henry', where: 'UK tour series', confirmed: ['Skiddle', 'Kaboodle', 'DICE', 'Resident Advisor', 'Ticketmaster'], reported: [],
+    evidence: [['wah.london lists 4 outlets', 'https://wah.london/'], ['WAH x WHP sells on Ticketmaster', 'https://worriedabouthenry.com/events/']] },
+  { name: 'Creamfields', where: 'Daresbury, Cheshire', confirmed: ['Ticketmaster'], reported: [],
+    evidence: [['creamfields.com links to ticketmaster.co.uk', 'https://www.creamfields.com'], ['Discovery API: 27 listings', null]] },
+  { name: 'fabric', where: 'London', confirmed: ['Resident Advisor'], reported: [],
+    evidence: [['fabriclondon.com Buy Tickets goes to ra.co', 'https://www.fabriclondon.com']] },
+  { name: 'KOKO', where: 'London', confirmed: ['See Tickets', 'Ticketmaster'], reported: [],
+    evidence: [['Event pages link to koko.seetickets.com', 'https://koko.co.uk/events/talia-mar'], ['Discovery API: 33 listings', null]] },
+  { name: 'Amnesia Ibiza', where: 'Ibiza', confirmed: ['CM.com'], reported: [],
+    evidence: [['amnesia.es links go to sales.ticketing.cm.com', 'https://www.amnesia.es']] },
+];
+const PLATFORMS = [
+  { name: 'Ticketmaster', status: ['no', 'Prohibited without authorisation'],
+    rule: 'Purchase Policy 4.10: no tickets through "unauthorised use of any robot, spider or other automated device or software". Queue uses bot detection.',
+    route: 'Partner API, restricted to companies with existing distribution relationships. Discovery API open (in use).',
+    src: 'https://www.ticketmaster.co.uk/legal/purchase.html' },
+  { name: 'Resident Advisor', status: ['no', 'Written authorisation needed'],
+    rule: 'Terms (3 Apr 2025): no access "via a means we have not authorised in writing in advance, including automated devices, scripts, bots".',
+    route: 'No public API or partner programme found.',
+    src: 'https://ra.co/terms' },
+  { name: 'Skiddle', status: ['open', 'Most open: ask first'],
+    rule: 'Ticket terms (8 Jun 2026) and website disclaimer contain no automated-buying, bot or scraping clause. Tickets not for commercial use unless Skiddle or the organiser allows.',
+    route: 'API (beta, non-commercial; commercial use by written approval, dev@skiddle.com), affiliate scheme, promoter tools.',
+    src: 'https://www.skiddle.com/terms/tickets.php' },
+  { name: 'Kaboodle', status: ['ask', 'Check full terms'],
+    rule: 'Website terms (PDF) contain no automated-buying clause. Agent terms not yet read; reported to soft-block bot-like traffic in its queue.',
+    route: 'None found yet.',
+    src: 'https://s3-eu-west-1.amazonaws.com/kaboodlecdn/Kaboodle/terms/website_terms.pdf' },
+  { name: 'DICE', status: ['unk', 'Terms blocked our check'],
+    rule: 'Terms pages refused automated reading. Reported (search only): tickets for personal use, not bought on behalf of a commercial third party.',
+    route: 'Not checked.',
+    src: 'https://dicefm.zendesk.com/hc/en-gb/articles/4412972920593-United-Kingdom-Terms-of-Use' },
+  { name: 'See Tickets', status: ['unk', 'Terms blocked our check'], rule: 'Terms page refused automated reading.', route: 'Not checked.', src: 'https://www.seetickets.com/terms' },
+  { name: 'CM.com, Fatsoma, UNVRS', status: ['unk', 'Not checked yet'], rule: 'Not yet reviewed.', route: 'Not checked.', src: null },
+];
+
+// Bars: venues per platform, confirmed vs reported, drawn to one scale.
+const tally = {};
+for (const v of VENUES) {
+  v.confirmed.forEach(p => (tally[p] ??= { c: 0, r: 0 }).c++);
+  v.reported.forEach(p => (tally[p] ??= { c: 0, r: 0 }).r++);
+}
+const rows = Object.entries(tally).filter(([p]) => p !== 'Ibiza resellers').sort((a, b) => (b[1].c + b[1].r) - (a[1].c + a[1].r) || b[1].c - a[1].c);
+const max = VENUES.length;
+document.getElementById('bars').innerHTML = rows.map(([p, t]) => `<div class="bar"><span>${p}</span>
+  <div class="track" title="${t.c} confirmed, ${t.r} reported"><div class="fill" style="width:${t.c / max * 100}%"></div><div class="fill rep" style="width:${t.r / max * 100}%"></div></div>
+  <span class="n">${t.c ? t.c + (t.r ? '+' + t.r : '') : '+' + t.r}</span></div>`).join('');
+
+document.querySelector('#venues tbody').innerHTML = VENUES.map(v => `<tr>
+  <td><b>${v.name}</b><div class="src">${v.where}</div></td>
+  <td><div class="chips">${v.confirmed.map(p => `<span class="chip">${p}</span>`).join('')}${v.reported.map(p => `<span class="chip rep">${p}</span>`).join('')}</div></td>
+  <td class="src">${v.evidence.map(([t, u]) => u ? `<a href="${u}" target="_blank" rel="noopener">${t}</a>` : t).join('<br>')}</td></tr>`).join('');
+
+document.querySelector('#platforms tbody').innerHTML = PLATFORMS.map(p => `<tr>
+  <td><b>${p.name}</b>${p.src ? `<div class="src"><a href="${p.src}" target="_blank" rel="noopener">Source</a></div>` : ''}</td>
+  <td>${p.rule}</td><td>${p.route}</td><td><span class="st ${p.status[0]}">${p.status[1]}</span></td></tr>`).join('');
+</script>
+</body>
+</html>

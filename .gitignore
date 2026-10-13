@@ -1,0 +1,6 @@
+node_modules/
+data/
+harness/report.json
+*.tmp
+.env
+harness/skiddle-report.json

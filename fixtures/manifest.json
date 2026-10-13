@@ -1,0 +1,40 @@
+{
+  "note": "Every fixture is labelled. 'synthetic' fixtures are hand-written to mirror structures observed once on public pages; they are not copies of live pages and their field names are hypotheses. 'real' fixtures are saved responses from an official API.",
+  "fixtures": [
+    { "id": "skiddle-v1", "source": "skiddle", "file": "skiddle/event-v1.html", "status": 200, "kind": "synthetic", "describes": "Event announced, two tiers on pre-order, general sale time published" },
+    { "id": "skiddle-v1-restyled", "source": "skiddle", "file": "skiddle/event-v1-restyled.html", "status": 200, "kind": "synthetic", "describes": "Same data as v1 with navigation and styling changed (must not alert)" },
+    { "id": "skiddle-v2", "source": "skiddle", "file": "skiddle/event-v2.html", "status": 200, "kind": "synthetic", "describes": "On sale: Early Entry sold out, GA price up, Late Entry tier added" },
+    { "id": "skiddle-v3-rescheduled", "source": "skiddle", "file": "skiddle/event-v3-rescheduled.html", "status": 200, "kind": "synthetic", "describes": "Event rescheduled one week later" },
+    { "id": "skiddle-conflict", "source": "skiddle", "file": "skiddle/event-conflict.html", "status": 200, "kind": "synthetic", "describes": "Offers say on sale, AggregateOffer says sold out (uncertain)" },
+    { "id": "skiddle-naive-time", "source": "skiddle", "file": "skiddle/event-naive-time.html", "status": 200, "kind": "synthetic", "describes": "Local times with no UTC offset in BST; price with symbol only" },
+    { "id": "skiddle-no-offers", "source": "skiddle", "file": "skiddle/event-no-offers.html", "status": 200, "kind": "synthetic", "describes": "Valid event with no offers: price and availability missing, not sold out" },
+    { "id": "skiddle-malformed", "source": "skiddle", "file": "skiddle/malformed.html", "status": 200, "kind": "synthetic", "describes": "Broken JSON-LD, event missing name and start" },
+    { "id": "skiddle-waf-challenge", "source": "skiddle", "file": "skiddle/waf-challenge.html", "status": 202, "kind": "synthetic", "describes": "AWS WAF challenge interstitial" },
+    { "id": "fatsoma-v1", "source": "fatsoma", "file": "fatsoma/event-v1.html", "status": 200, "kind": "synthetic", "describes": "Tiers with ownership checks; two foreign tiers and one foreign JSON-LD offer to quarantine" },
+    { "id": "fatsoma-v2", "source": "fatsoma", "file": "fatsoma/event-v2.html", "status": 200, "kind": "synthetic", "describes": "Tier 1 sold out, Tier 2 released" },
+    { "id": "dice-v1", "source": "dice", "file": "dice/event-v1.html", "status": 200, "kind": "synthetic", "describes": "Announced, no sale dates or price" },
+    { "id": "dice-v2", "source": "dice", "file": "dice/event-v2.html", "status": 200, "kind": "synthetic", "describes": "Presale and general sale times and prices published" },
+    { "id": "dice-conflict", "source": "dice", "file": "dice/event-conflict.html", "status": 200, "kind": "synthetic", "describes": "State and JSON-LD disagree on start time" },
+    { "id": "ticketmaster-discovery", "source": "ticketmaster", "file": "ticketmaster/discovery-1AMZkfMGkdrlUIi.json", "status": 200, "kind": "real", "observed_at": "2026-10-01T20:43:00.000Z", "describes": "Real Discovery API v2 event response saved 1 Oct 2026 (images and unrelated fields trimmed)" },
+    { "id": "ticketmaster-discovery-v2", "source": "ticketmaster", "file": "ticketmaster/discovery-1AMZkfMGkdrlUIi-v2-synthetic.json", "status": 200, "kind": "synthetic", "describes": "The real payload edited: status postponed, priceRanges added" },
+    { "id": "ticketmaster-interruption", "source": "ticketmaster", "file": "ticketmaster/interruption.html", "status": 403, "kind": "synthetic", "describes": "Bot-detection / access-interruption page" },
+    { "id": "ra-captcha", "source": "resident-advisor", "file": "resident-advisor/captcha.html", "status": 403, "kind": "synthetic", "describes": "CAPTCHA interstitial" },
+    { "id": "ra-synthetic", "source": "resident-advisor", "file": "resident-advisor/synthetic-event.html", "status": 200, "kind": "synthetic", "describes": "Generic Event JSON-LD; RA structure unverified" }
+  ],
+  "demo": {
+    "initial": ["skiddle-v1", "skiddle-no-offers", "fatsoma-v1", "dice-v1", "ticketmaster-discovery", "ra-synthetic"],
+    "steps": [
+      { "fixture": "skiddle-v1-restyled", "explains": "Same data, new markup: no change, no alert" },
+      { "fixture": "skiddle-waf-challenge", "explains": "Challenge page: rejected, source marked challenge_detected, no alert" },
+      { "fixture": "skiddle-v2", "explains": "Published status, prices and a new tier change: one de-duplicated alert" },
+      { "fixture": "skiddle-v2", "explains": "Same observation again: unchanged, no duplicate alert" },
+      { "fixture": "dice-v2", "explains": "DICE publishes presale and general sale times" },
+      { "fixture": "fatsoma-v2", "explains": "Fatsoma tier statuses change; foreign tiers stay quarantined" },
+      { "fixture": "skiddle-conflict", "explains": "Conflicting availability: uncertain, last valid value kept, no alert" },
+      { "fixture": "ticketmaster-interruption", "explains": "Interruption page: rejected" },
+      { "fixture": "ra-captcha", "explains": "CAPTCHA: rejected, not solved" },
+      { "fixture": "skiddle-v3-rescheduled", "explains": "Rescheduled: date and status change alert" },
+      { "fixture": "skiddle-malformed", "explains": "Malformed page: parse_error, retains last valid data, no alert" }
+    ]
+  }
+}

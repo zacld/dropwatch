@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dropwatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f3f1f8; --surface:#ffffff; --surface-2:#ebe8f3; --line:#d9d4e6;
+  --ink:#1c1830; --ink-2:#5b5573; --accent:#e5533d; --accent-ink:#ffffff; --accent-soft:#fde4de;
+  --dusk:#3b2e7a; --ok:#1f8a5b; --ok-soft:#dcf2e7; --warn:#b26a00; --warn-soft:#fbecd2; --bad:#b4312a; --bad-soft:#f8dcda;
+  --armed-soft:#e3def6;
+  --shadow:0 1px 2px rgba(28,24,48,.06),0 8px 24px rgba(28,24,48,.06);
+  --display:"Unbounded",system-ui,sans-serif; --body:"Manrope",system-ui,-apple-system,Segoe UI,sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  color-scheme:dark;
+  --bg:#120f22; --surface:#1b1731; --surface-2:#241f3f; --line:#332c55;
+  --ink:#eeeaf8; --ink-2:#a49dc2; --accent:#ff7a5c; --accent-ink:#1a0f0c; --accent-soft:#3a1f22;
+  --dusk:#b7a8ff; --ok:#5fd39b; --ok-soft:#163327; --warn:#f2b552; --warn-soft:#352a14; --bad:#ff8a80; --bad-soft:#3a1c1f;
+  --armed-soft:#2a2350; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px 48px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(160deg,var(--dusk) 0 48%,var(--accent) 48% 100%);position:relative}
+.mark::after{content:"";position:absolute;left:50%;top:48%;width:14px;height:14px;border-radius:50%;background:var(--bg);transform:translate(-50%,-50%)}
+.brand h1{font-size:20px}.brand small{display:block;color:var(--ink-2);font-size:12px;font-weight:500}
+.acct{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--bad)}.dot.on{background:var(--ok)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.strip div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink-2)}
+.strip b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.tile .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:4px}.tile .v.save{color:var(--ok)}
+.grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+.col{display:grid;gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.panel-h{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.panel-h h2{font-size:15px}.panel-b{padding:18px}
+form{display:grid;gap:16px}
+.f{display:grid;gap:6px;font-size:13px;font-weight:600}
+.hint{font-weight:400;color:var(--ink-2);font-size:12px}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:max-content;background:var(--surface-2)}
+.qty button{border:0;background:transparent;color:var(--ink);width:40px;height:40px;font-size:18px}
+.qty output{width:44px;text-align:center;font-family:var(--mono);font-weight:600}
+.price{position:relative}.price span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-2);font-family:var(--mono)}
+.price input{padding-left:28px;font-family:var(--mono)}
+.ladder{display:grid;gap:4px;font-size:12px}
+.lp{display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:var(--surface-2);font-family:var(--mono)}
+.lp.in{background:var(--ok-soft);color:var(--ok)}.lp.out{opacity:.55;text-decoration:line-through}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink)}
+.check input{margin-top:3px;accent-color:var(--accent)}
+fieldset{border:0;padding:0;margin:0;display:grid;gap:8px}legend{font-size:13px;font-weight:600;padding:0;margin-bottom:6px}
+fieldset select{margin-left:24px;width:calc(100% - 24px)}
+.auth{border:1px solid var(--dusk);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--armed-soft)}
+.auth blockquote{margin:0;font-size:13px;line-height:1.55}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:700;background:var(--accent);color:var(--accent-ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:600;padding:8px 12px;font-size:13px;text-decoration:none;display:inline-block}
+.err{color:var(--bad);font-size:13px;margin:0;display:grid;gap:4px}
+.note{font-size:12px;color:var(--ink-2);margin:0}
+.watches{display:grid;gap:14px}
+.w{border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:14px}
+.w-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.w-top h3{font-size:16px}.meta{color:var(--ink-2);font-size:13px;margin-top:4px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;height:max-content}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-armed{background:var(--armed-soft);color:var(--dusk)}
+.p-attempting{background:var(--warn-soft);color:var(--warn)}
+.p-needs_customer{background:var(--accent-soft);color:var(--accent)}
+.p-secured{background:var(--ok-soft);color:var(--ok)}
+.p-missed,.p-failed{background:var(--bad-soft);color:var(--bad)}
+.p-revoked{background:var(--surface-2);color:var(--ink-2)}
+.p-attempting::before,.p-needs_customer::before{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+.tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tier{border-radius:8px;padding:8px 10px;background:var(--surface-2);font-size:12px;border:1px solid transparent}
+.tier b{display:block;font-family:var(--mono);font-size:14px}
+.tier.out{opacity:.5}.tier.got{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.row{display:flex;gap:20px;flex-wrap:wrap;align-items:end;justify-content:space-between}
+.facts{display:flex;gap:20px;flex-wrap:wrap}.fact .v{font-family:var(--mono);font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.needs{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:12px 14px;display:grid;gap:10px;font-size:13px}
+.result{border-radius:10px;padding:10px 12px;font-size:13px;background:var(--surface-2)}
+.log{font-family:var(--mono);font-size:12px;background:var(--surface-2);border-radius:8px;padding:10px 12px;display:grid;gap:3px;max-height:240px;overflow:auto}
+.log .t{color:var(--ink-2)}.log .ok{color:var(--ok)}.log .bad{color:var(--bad)}.log .warn{color:var(--warn)}
+details{font-size:13px}summary{cursor:pointer;color:var(--ink-2);font-weight:600}
+details blockquote{margin:8px 0 0;padding:10px 12px;border-left:3px solid var(--dusk);background:var(--surface-2);border-radius:0 8px 8px 0}
+.empty{color:var(--ink-2);text-align:center;padding:32px 12px}
+.notes{display:grid;gap:8px;font-size:13px;max-height:320px;overflow:auto}
+.notes div{border-bottom:1px solid var(--line);padding-bottom:8px}.notes small{color:var(--ink-2);display:block}
+.sellers{font-size:12px;color:var(--ink-2);display:grid;gap:4px}
+@media (max-width:1000px){.strip{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){.grid{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){.strip{grid-template-columns:1fr}.tiers{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){.pill::before{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>Dropwatch</h1><small>Early-release tickets, bought while you sleep</small></div></div>
+    <div class="acct"><span class="dot" id="c-dot"></span><span id="c-text">Checking Companion…</span></div>
+  </header>
+
+  <section class="strip" aria-label="How Dropwatch works">
+    <div><b>Your login stays with you</b>You sign in to the ticket seller on your own device. Passwords, saved cards and 2FA never leave it.</div>
+    <div><b>Only what you authorised</b>At release the Companion makes one attempt: your event, quantity and tier choice, never above your per-ticket max or total cap.</div>
+    <div><b>You handle any checks</b>If the seller or your bank asks for verification, the Companion pauses and asks you. It never tries to get past queues, CAPTCHAs or security checks.</div>
+    <div><b>Seller limits enforced</b>Dropwatch enforces each seller's stated per-customer ticket limit and does not support multiple accounts, identities or other methods intended to obtain tickets above that limit.</div>
+  </section>
+
+  <section class="tiles" aria-label="Summary">
+    <div class="tile"><div class="k">Armed watches</div><div class="v" id="t-armed">0</div></div>
+    <div class="tile"><div class="k">Orders secured</div><div class="v" id="t-secured">0</div></div>
+    <div class="tile"><div class="k">Saved vs final tier</div><div class="v save" id="t-saved">£0</div></div>
+    <div class="tile"><div class="k">Success fees due</div><div class="v" id="t-fees">£0.00</div></div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="new-h">
+        <div class="panel-h"><h2 id="new-h">New watch</h2></div>
+        <div class="panel-b">
+          <form id="f" novalidate>
+            <label class="f">Event
+              <select id="event"></select>
+              <span class="hint" id="ev-hint"></span>
+            </label>
+            <div class="f">Tickets
+              <div class="qty"><button type="button" id="q-minus" aria-label="Fewer tickets">−</button><output id="qty">2</output><button type="button" id="q-plus" aria-label="More tickets">+</button></div>
+              <span class="hint" id="limit-hint"></span>
+            </div>
+            <label class="f">Maximum price per ticket
+              <div class="price"><span>£</span><input id="max" type="number" min="1" step="1" value="70" inputmode="numeric"></div>
+            </label>
+            <label class="f">Total spend cap
+              <div class="price"><span>£</span><input id="cap" type="number" min="1" step="1" value="140" inputmode="numeric"></div>
+              <span class="hint" id="cap-hint"></span>
+            </label>
+            <div class="ladder" id="ladder" aria-label="Tiers within your limits"></div>
+            <fieldset>
+              <legend>Which tier</legend>
+              <label class="check"><input type="radio" name="rule" id="r-selected" checked><span><b>Only buy my selected tier</b></span></label>
+              <select id="tier" aria-label="Selected tier"></select>
+              <label class="check"><input type="radio" name="rule" id="r-any"><span><b>Allow any eligible tier</b> within my per-ticket max and total cap (cheapest available first)</span></label>
+            </fieldset>
+            <div class="auth">
+              <div class="k" style="color:var(--dusk)">Purchase authorisation</div>
+              <blockquote id="auth-text">Choose an event to see the authorisation.</blockquote>
+              <label class="check"><input type="checkbox" id="consent"><span><b>I authorise this purchase attempt.</b> I can revoke it any time before release.</span></label>
+            </div>
+            <div class="err" id="err" hidden></div>
+            <button class="btn" type="submit" id="submit">Authorise and arm</button>
+            <p class="note" id="fee-note"></p>
+            <div class="sellers" id="sellers"></div>
+          </form>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="n-h">
+        <div class="panel-h"><h2 id="n-h">Notifications</h2><span class="hint">Push and email</span></div>
+        <div class="panel-b"><div class="notes" id="notes"><div class="hint">None yet.</div></div></div>
+      </section>
+    </div>
+    <section class="panel" aria-labelledby="w-h">
+      <div class="panel-h"><h2 id="w-h">Your watches</h2></div>
+      <div class="panel-b"><div class="watches" id="list"></div></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const gbp = n => '£' + (Number.isInteger(n) ? n : Number(n).toFixed(2));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const api = async (method, path, body) => {
+  const res = await fetch(path, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Something went wrong.');
+  return data;
+};
+const LABEL = { armed: 'Armed', attempting: 'Attempting', needs_customer: 'Needs you', secured: 'Secured', missed: 'Missed', failed: 'Failed · no charge', revoked: 'Revoked' };
+const ACTIVE = ['armed', 'attempting', 'needs_customer'];
+let events = [], watches = [], status = null, qty = 2, capEdited = false, preview = null, previewSeq = 0;
+const openAuth = new Set(); // authorisation records the customer has opened, kept open across refreshes
+document.addEventListener('toggle', e => {
+  const id = e.target.dataset?.auth;
+  if (id) e.target.open ? openAuth.add(id) : openAuth.delete(id);
+}, true);
+
+function fmtDur(ms) {
+  if (ms <= 0) return 'now';
+  const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4), s = Math.floor(ms % 6e4 / 1e3);
+  return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m` : `${m}m ${String(s).padStart(2, '0')}s`;
+}
+const currentEvent = () => events.find(e => `${e.sellerId}|${e.id}` === $('event').value);
+const securedFor = ev => watches.filter(w => w.sellerId === ev.sellerId && w.eventId === ev.id && w.status === 'secured').reduce((s, w) => s + w.terms.qty, 0);
+
+// ---- form ----
+function renderForm() {
+  const ev = currentEvent();
+  if (!ev) { $('auth-text').textContent = 'No events are available from enabled sellers.'; return; }
+  const left = ev.limit - securedFor(ev);
+  qty = Math.max(1, Math.min(qty, Math.max(left, 1)));
+  $('qty').textContent = qty;
+  $('ev-hint').textContent = `${ev.sellerName} · release in ${fmtDur(ev.saleStart - Date.now())} · limit ${ev.limit} per customer`;
+  $('limit-hint').textContent = left <= 0 ? `Dropwatch already secured the seller's limit of ${ev.limit} for this event.`
+    : `Seller limit: ${ev.limit} per customer.` + (left < ev.limit ? ` Dropwatch already secured ${ev.limit - left} for you, so ${left} left.` : '');
+  const max = Number($('max').value) || 0;
+  if (!capEdited) $('cap').value = max * qty;
+  const cap = Math.min(Number($('cap').value) || 0, max * qty);
+  $('cap-hint').textContent = Number($('cap').value) > max * qty ? `Higher than ${qty} × ${gbp(max)}, so ${gbp(max * qty)} applies.` : 'Dropwatch stops if the basket total would go over this.';
+  const any = $('r-any').checked, sel = $('tier');
+  const fits = ev.tiers.filter(t => t.price <= max && t.price * qty <= cap);
+  const opts = fits.map(t => `<option value="${esc(t.name)}">${esc(t.name)} · ${gbp(t.price)}</option>`).join('') || '<option value="">No tier within your limits</option>';
+  if (sel.dataset.o !== opts) { const prev = sel.value; sel.innerHTML = opts; sel.dataset.o = opts; if (fits.some(t => t.name === prev)) sel.value = prev; }
+  sel.disabled = any;
+  $('ladder').innerHTML = ev.tiers.map(t => {
+    const ok = t.price <= max && t.price * qty <= cap && (any || t.name === sel.value);
+    return `<div class="lp ${ok ? 'in' : 'out'}"><span>${esc(t.name)}</span><span>${gbp(t.price)} × ${qty} = ${gbp(t.price * qty)}</span></div>`;
+  }).join('');
+  requestPreview();
+}
+
+async function requestPreview() {
+  const ev = currentEvent();
+  if (!ev) return;
+  const seq = ++previewSeq;
+  const body = formBody(ev);
+  try {
+    const p = await api('POST', '/api/authorisation/preview', body);
+    if (seq !== previewSeq) return;
+    if (!preview || preview.textHash !== p.textHash) $('consent').checked = false;
+    preview = p;
+    $('auth-text').textContent = p.text ?? 'Fix the issues below to see the authorisation.';
+    showErrors(p.ok ? [] : p.errors);
+  } catch (e) { showErrors([e.message]); }
+}
+function formBody(ev) {
+  return {
+    sellerId: ev.sellerId, eventId: ev.id, qty, maxPerTicket: Number($('max').value), totalCap: Number($('cap').value),
+    tierRule: $('r-any').checked ? 'any' : 'selected', selectedTier: $('r-any').checked ? null : $('tier').value,
+  };
+}
+function showErrors(list) {
+  $('err').hidden = !list.length;
+  $('err').innerHTML = list.map(e => `<span>${esc(e)}</span>`).join('');
+}
+
+$('q-minus').onclick = () => { qty = Math.max(1, qty - 1); renderForm(); };
+$('q-plus').onclick = () => { const ev = currentEvent(); qty = Math.min(ev ? ev.limit - securedFor(ev) : 1, qty + 1); renderForm(); };
+$('cap').oninput = () => { capEdited = true; renderForm(); };
+['event', 'max', 'tier', 'r-any', 'r-selected'].forEach(id => $(id).addEventListener('input', renderForm));
+$('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const ev = currentEvent();
+  if (!ev || !preview) return;
+  if (!preview.ok) return showErrors(preview.errors);
+  if (!$('consent').checked) return showErrors(['Read the authorisation and tick the box to confirm it.']);
+  $('submit').disabled = true;
+  try {
+    const w = await api('POST', '/api/watches', { ...formBody(ev), authorise: true, textHash: preview.textHash });
+    $('consent').checked = false; capEdited = false;
+    showErrors([]);
+    await refresh();
+    flash(`Authorised (${w.authorisation.ref}) and armed for ${w.eventName}`);
+  } catch (err) { showErrors([err.message]); }
+  finally { $('submit').disabled = false; }
+});
+
+// ---- watches ----
+function renderWatches() {
+  const list = $('list');
+  if (!watches.length) { list.innerHTML = '<div class="empty">No watches yet. Choose an event, set your limits and authorise one purchase attempt.</div>'; }
+  else list.innerHTML = watches.map(w => {
+    const t = w.terms, order = w.result?.order;
+    const tiers = w.tiers.map(tr => {
+      const allowed = tr.price <= t.maxPerTicket && tr.price * t.qty <= t.totalCap && (t.tierRule === 'any' || tr.name === t.selectedTier);
+      const cls = order && order.tierName === tr.name ? 'got' : allowed ? '' : 'out';
+      return `<div class="tier ${cls}">${esc(tr.name)}<b>${gbp(tr.price)}</b></div>`;
+    }).join('');
+    const final = Math.max(...w.tiers.map(x => x.price));
+    const facts = [
+      ['Tickets', t.qty], ['Max / ticket', gbp(t.maxPerTicket)], ['Total cap', gbp(t.totalCap)],
+      ['Tier', t.tierRule === 'any' ? 'Any eligible' : t.selectedTier],
+      w.status === 'armed' ? ['Release in', `<span data-cd="${w.releaseAt}">${fmtDur(w.releaseAt - Date.now())}</span>`] : null,
+      order ? ['Paid to seller', gbp(order.total)] : null,
+      order ? ['Saved', gbp((final - order.unitPrice) * order.qty)] : null,
+    ].filter(Boolean).map(([k, v]) => `<div class="fact"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+    const btns = w.status === 'armed' ? `<button class="btn ghost" data-revoke="${w.id}">Revoke authorisation</button>`
+      : ACTIVE.includes(w.status) ? '' : `<button class="btn ghost" data-del="${w.id}">Remove</button>`;
+    const needs = w.status === 'needs_customer' && w.prompt ? `<div class="needs" role="alert"><div><b>${esc(w.sellerName)} needs you.</b> ${esc(w.prompt.message)} The Companion is waiting and will not try to get past it.</div>${w.prompt.url ? `<div><a class="btn" href="${esc(w.prompt.url)}" target="_blank" rel="noopener">Open the check</a></div>` : ''}</div>` : '';
+    const result = w.result ? `<div class="result">${w.status === 'secured' ? `Order <b>${esc(order.orderRef)}</b>: ${order.qty} × ${esc(order.tierName)} for ${gbp(order.total)}. Success fee ${gbp(w.fee)}.${w.result.limitBreach ? ' <b style="color:var(--bad)">Limit alert raised.</b>' : ''}` : esc(w.result.reason)}</div>` : '';
+    const log = w.log.length ? `<div class="log" aria-live="polite">${w.log.map(l => `<div><span class="t">${new Date(l.at).toLocaleTimeString('en-GB')}</span> ${l.step ? `<span class="t">${l.step} ·</span> ` : ''}<span class="${l.level === 'info' ? '' : l.level}">${esc(l.msg)}</span></div>`).join('')}</div>` : '';
+    return `<article class="w">
+      <div class="w-top"><div><h3>${esc(w.eventName)}</h3><div class="meta">${esc(w.venue)} · ${esc(w.sellerName)}</div></div><span class="pill p-${w.status}">${LABEL[w.status]}</span></div>
+      <div class="tiers">${tiers}</div>
+      <div class="row"><div class="facts">${facts}</div><div class="actions">${btns}</div></div>
+      ${needs}${result}${log}
+      <details data-auth="${w.id}" ${openAuth.has(w.id) ? 'open' : ''}><summary>Authorisation ${esc(w.authorisation.ref)} · ${w.authorisation.revokedAt ? 'revoked' : 'given'} ${new Date(w.authorisation.revokedAt ?? w.authorisation.acceptedAt).toLocaleString('en-GB')}</summary><blockquote>${esc(w.authorisation.text)}</blockquote></details>
+    </article>`;
+  }).join('');
+  const sec = watches.filter(w => w.status === 'secured');
+  $('t-armed').textContent = watches.filter(w => w.status === 'armed').length;
+  $('t-secured').textContent = sec.length;
+  $('t-saved').textContent = gbp(sec.reduce((a, w) => a + (Math.max(...w.tiers.map(x => x.price)) - w.result.order.unitPrice) * w.result.order.qty, 0));
+  $('t-fees').textContent = '£' + sec.reduce((a, w) => a + w.fee, 0).toFixed(2);
+}
+$('list').addEventListener('click', async e => {
+  const rv = e.target.closest('[data-revoke]'), del = e.target.closest('[data-del]');
+  try {
+    if (rv) { await api('POST', `/api/watches/${rv.dataset.revoke}/revoke`); flash('Authorisation revoked. Nothing will be bought.'); }
+    if (del) await api('DELETE', `/api/watches/${del.dataset.del}`);
+    await refresh();
+  } catch (err) { flash(err.message); }
+});
+
+function renderStatus() {
+  const on = status?.companion.online;
+  $('c-dot').classList.toggle('on', !!on);
+  $('c-text').textContent = on ? `Companion online · ${status.companion.deviceId ?? 'this device'}` : 'Companion offline: start it on your device before release';
+  $('fee-note').innerHTML = `Success fee <b>${gbp(status?.fee ?? 4.99)}</b> per secured order. Nothing is charged if the attempt misses or fails.`;
+  $('sellers').innerHTML = (status?.sellers ?? []).filter(s => !s.enabled).map(s => `<span><b>${esc(s.name)}</b>: ${esc(s.reason)}</span>`).join('');
+}
+async function renderNotes() {
+  const notes = await api('GET', '/api/notifications');
+  $('notes').innerHTML = notes.length ? notes.map(n => `<div><b>${esc(n.title)}</b><br>${esc(n.body)}<small>${new Date(n.at).toLocaleString('en-GB')} · ${n.channels.join(' + ')}</small></div>`).join('') : '<div class="hint">None yet.</div>';
+}
+
+async function loadEvents() {
+  events = await api('GET', '/api/events');
+  const sel = $('event'), prev = sel.value;
+  sel.innerHTML = events.map(e => `<option value="${e.sellerId}|${esc(e.id)}">${esc(e.name)} — ${esc(e.venue)} (${esc(e.sellerName)})</option>`).join('');
+  if (events.some(e => `${e.sellerId}|${e.id}` === prev)) sel.value = prev;
+}
+async function refresh() {
+  [watches, status] = await Promise.all([api('GET', '/api/watches'), api('GET', '/api/status')]);
+  renderWatches(); renderStatus(); renderNotes();
+}
+let flashTimer;
+function flash(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px'; document.body.append(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(flashTimer); flashTimer = setTimeout(() => (t.hidden = true), 3000);
+}
+
+(async () => {
+  await loadEvents();
+  await refresh();
+  renderForm();
+  setInterval(() => refresh().catch(() => {}), 2000);
+  setInterval(() => loadEvents().then(renderForm).catch(() => {}), 30000);
+  setInterval(() => document.querySelectorAll('[data-cd]').forEach(el => (el.textContent = fmtDur(Number(el.dataset.cd) - Date.now()))), 1000);
+})();
+</script>
+</body>
+</html>

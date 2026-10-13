@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dropwatch-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/demo.js"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "dropwatch-monitor-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/monitor-demo.js"
+      ],
+      "port": 4200
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "name": "Josh Baker b2b Kettama b2b Prospa",
+  "type": "event",
+  "id": "1AMZkfMGkdrlUIi",
+  "test": false,
+  "url": "https://www.ticketmaster.co.uk/josh-baker-b2b-kettama-b2b-prospa-london-03-07-2027/event/37006537DEAF6A2C",
+  "sales": {
+    "public": {
+      "startDateTime": "2026-09-30T09:00:00Z",
+      "startTBD": false,
+      "startTBA": false,
+      "endDateTime": "2027-07-03T13:00:00Z"
+    },
+    "presales": [
+      {
+        "startDateTime": "2026-09-29T09:00:00Z",
+        "endDateTime": "2026-09-30T09:00:00Z",
+        "name": "Festival Presale"
+      }
+    ]
+  },
+  "dates": {
+    "start": {
+      "localDate": "2027-07-03",
+      "localTime": "14:00:00",
+      "dateTime": "2027-07-03T13:00:00Z",
+      "dateTBD": false,
+      "dateTBA": false,
+      "timeTBA": false,
+      "noSpecificTime": false
+    },
+    "timezone": "Europe/London",
+    "status": {
+      "code": "onsale"
+    },
+    "spanMultipleDays": false
+  },
+  "classifications": [
+    {
+      "primary": true,
+      "segment": {
+        "id": "KZFzniwnSyZfZ7v7nJ",
+        "name": "Music"
+      },
+      "genre": {
+        "id": "KnvZfZ7vAvF",
+        "name": "Dance/Electronic"
+      },
+      "subGenre": {
+        "id": "KZazBEonSMnZfZ7vaEn",
+        "name": "Amapiano"
+      },
+      "type": {
+        "id": "KZAyXgnZfZ7v7nI",
+        "name": "Undefined"
+      },
+      "subType": {
+        "id": "KZFzBErXgnZfZ7v7lJ",
+        "name": "Undefined"
+      },
+      "family": false
+    }
+  ],
+  "promoter": {
+    "id": "1970",
+    "name": "FESTIVAL REPUBLIC LTD",
+    "description": "FESTIVAL REPUBLIC LTD / NTL / GBR"
+  },
+  "info": "Tickets are only valid when purchased directly from official agents of Festival Republic. We do not accept Print at Home tickets, Booking Confirmations, screenshots or photos of tickets. Tickets for this event have a unique barcode which will be scanned on entry and if found to b…",
+  "pleaseNote": "All ticket categories use fixed tier pricing. All Ticketholders must be 18 years or older to attend this event. Anyone aged 17 and under are not permitted to attend the event, even when accompanied by…",
+  "ticketLimit": {
+    "info": "There is a ticket limit of 6 (six) tickets per person, per address and per credit card on this event."
+  },
+  "_embedded": {
+    "venues": [
+      {
+        "name": "Finsbury Park",
+        "id": "KovZ9177Xaf",
+        "url": "https://www.ticketmaster.co.uk/finsbury-park-tickets-london/venue/452900",
+        "postalCode": "N4 2DH",
+        "timezone": "Europe/London",
+        "city": {
+          "name": "London"
+        },
+        "country": {
+          "name": "Great Britain",
+          "countryCode": "GB"
+        },
+        "address": {
+          "line1": "Seven Sisters Road"
+        }
+      }
+    ],
+    "attractions": [
+      {
+        "name": "Josh Baker",
+        "type": "attraction",
+        "id": "K8vZ917qEAV",
+        "url": "https://www.ticketmaster.com/josh-baker-tickets/artist/3423444"
+      },
+      {
+        "name": "KETTAMA",
+        "type": "attraction",
+        "id": "K8vZ9179iH7",
+        "url": "https://www.ticketmaster.com/kettama-tickets/artist/2522236"
+      },
+      {
+        "name": "Prospa",
+        "type": "attraction",
+        "id": "K8vZ9179Hz0",
+        "url": "https://www.ticketmaster.com/prospa-tickets/artist/2612755"
+      }
+    ]
+  }
+}

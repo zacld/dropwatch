@@ -1,0 +1,26 @@
+{
+  "name": "dropwatch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dropwatch: event monitoring and alerts (monitor/), plus the earlier customer-authorised checkout prototype (server/, companion/).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "node scripts/demo.js",
+    "server": "node server/index.js",
+    "seller": "node test-seller/index.js",
+    "companion": "node companion/index.js",
+    "harness": "node harness/run.js",
+    "test": "node --test \"test/*.test.js\"",
+    "research": "node scripts/research-server.js",
+    "monitor": "node monitor/index.js",
+    "monitor:demo": "node scripts/monitor-demo.js",
+    "monitor:cli": "node monitor/cli.js",
+    "test:monitor": "node --test test/monitor-parsers.test.js test/monitor-engine.test.js test/monitor-api.test.js"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dropwatch Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f3f1f8; --surface:#ffffff; --surface-2:#ebe8f3; --line:#d9d4e6;
+  --ink:#1c1830; --ink-2:#5b5573; --accent:#e5533d; --accent-ink:#ffffff; --accent-soft:#fde4de;
+  --dusk:#3b2e7a; --dusk-soft:#e3def6; --ok:#1f8a5b; --ok-soft:#dcf2e7; --warn:#b26a00; --warn-soft:#fbecd2; --bad:#b4312a; --bad-soft:#f8dcda;
+  --shadow:0 1px 2px rgba(28,24,48,.06),0 8px 24px rgba(28,24,48,.06);
+  --display:"Unbounded",system-ui,sans-serif; --body:"Manrope",system-ui,-apple-system,Segoe UI,sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  color-scheme:dark;
+  --bg:#120f22; --surface:#1b1731; --surface-2:#241f3f; --line:#332c55;
+  --ink:#eeeaf8; --ink-2:#a49dc2; --accent:#ff7a5c; --accent-ink:#1a0f0c; --accent-soft:#3a1f22;
+  --dusk:#b7a8ff; --dusk-soft:#2a2350; --ok:#5fd39b; --ok-soft:#163327; --warn:#f2b552; --warn-soft:#352a14; --bad:#ff8a80; --bad-soft:#3a1c1f;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px 48px}
+.wrap{max-width:1240px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--dusk);font-weight:700}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0 14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(160deg,var(--dusk) 0 48%,var(--accent) 48% 100%);position:relative;flex:none}
+.mark::after{content:"";position:absolute;left:50%;top:48%;width:14px;height:14px;border-radius:50%;background:var(--bg);transform:translate(-50%,-50%)}
+.brand h1{font-size:20px}.brand small{display:block;color:var(--ink-2);font-size:12px;font-weight:500}
+.sample{border:1.5px dashed var(--warn);background:var(--warn-soft);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:13.5px;margin-bottom:16px}
+.sample b{color:var(--warn)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+.tile .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:2px}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+.col{display:grid;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);min-width:0}
+.panel-h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-h h2{font-size:15px}.panel-b{padding:16px 18px}
+.hint{font-weight:400;color:var(--ink-2);font-size:12.5px}
+form{display:grid;gap:12px}
+label.f{display:grid;gap:5px;font-size:13px;font-weight:700}
+input[type=text],input[type=number],input[type=date],input[type=search],select{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.checks label{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:8px 14px;font-weight:700}
+.btn.primary{background:var(--dusk);color:var(--bg);border-color:var(--dusk)}
+.btn:disabled{opacity:.5;cursor:default}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end}
+.toggle{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;white-space:nowrap;padding-bottom:8px}
+.feed{display:grid;gap:12px}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:8px;background:var(--surface)}
+.card.nomatch{opacity:.62}
+.card-top{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.card h3{font-family:var(--body);font-size:16px;font-weight:800;letter-spacing:0}
+.meta{color:var(--ink-2);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--surface-2);color:var(--ink-2)}
+.chip.src{background:var(--dusk-soft);color:var(--dusk)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.sample{background:transparent;border:1px dashed var(--warn);color:var(--warn)}
+.chip.live{background:var(--ok-soft);color:var(--ok)}
+.price{font-family:var(--mono);font-weight:600;white-space:nowrap}
+.changes{font-size:12.5px;color:var(--ink-2);display:grid;gap:2px;border-top:1px solid var(--line);padding-top:8px}
+.changes b{color:var(--ink);font-weight:700}
+.linkbtn{background:none;border:0;padding:0;color:var(--dusk);font-weight:800;text-decoration:underline}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.mono,.mono{font-family:var(--mono);font-size:12px}
+.notes{display:grid;gap:10px;max-height:520px;overflow:auto}
+.note{border-left:3px solid var(--dusk);padding:2px 0 2px 10px;font-size:13px}
+.note b{display:block;font-size:13.5px}
+.note small{color:var(--ink-2)}
+.empty{color:var(--ink-2);font-size:13.5px;padding:8px 0}
+.demo{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.demo-out{font-size:13px;color:var(--ink-2);flex:1;min-width:220px}
+dialog{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--surface);color:var(--ink);width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,8,20,.55)}
+.dlg-h{position:sticky;top:0;background:var(--surface);padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:start;z-index:1}
+.dlg-b{padding:16px 20px;display:grid;gap:20px}
+.dlg-b h4{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.timeline{display:grid;gap:6px;font-size:13px}
+.timeline div{display:grid;grid-template-columns:150px 1fr;gap:10px}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){.filters{grid-template-columns:1fr 1fr}.filters .grow{grid-column:1/-1}.timeline div{grid-template-columns:1fr}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>Dropwatch Monitor</h1><small>Event discovery, published-status changes and alerts. Read-only: nothing is bought.</small></div></div>
+    <div class="chips" id="health-summary"></div>
+  </header>
+
+  <div class="sample" id="sample-banner" hidden><b>Sample data.</b> Events marked <span class="chip sample">Sample</span> come from fixtures in <span class="mono">fixtures/</span>, not live observations. Their prices, statuses and source health say nothing about the real sites.</div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Opportunities</div><div class="v" id="t-events">–</div></div>
+    <div class="tile"><div class="k">Changes recorded</div><div class="v" id="t-changes">–</div></div>
+    <div class="tile"><div class="k">Alerts sent</div><div class="v" id="t-notes">–</div></div>
+    <div class="tile"><div class="k">Duplicates withheld</div><div class="v" id="t-supp">–</div></div>
+  </div>
+
+  <section class="panel" id="demo-panel" hidden style="margin-bottom:20px">
+    <div class="panel-b demo">
+      <button class="btn primary" id="next-step">Replay next observation</button>
+      <div class="demo-out" id="demo-out">Steps through saved fixture observations: markup-only changes, challenge pages, real changes, repeats and conflicts.</div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <div class="panel-h"><h2>Your interests</h2><span class="hint">Alert preferences</span></div>
+        <div class="panel-b">
+          <form id="prefs">
+            <label class="f">Artists <input type="text" name="artists" placeholder="KETTAMA, Prospa"></label>
+            <label class="f">Teams <input type="text" name="teams" placeholder="e.g. Manchester United"></label>
+            <label class="f">Venues <input type="text" name="venues" placeholder="Depot Mayfield"></label>
+            <label class="f">Categories <input type="text" name="categories" placeholder="techno, club-night"></label>
+            <label class="f">Cities <input type="text" name="cities" placeholder="Manchester, London"></label>
+            <div class="row2">
+              <label class="f">From <input type="date" name="date_from"></label>
+              <label class="f">To <input type="date" name="date_to"></label>
+            </div>
+            <div class="row2">
+              <label class="f">Max price <input type="number" name="max_price" min="0" step="0.5" placeholder="Any"></label>
+              <label class="f">Currency <select name="currency"><option>GBP</option><option>EUR</option><option>USD</option></select></label>
+            </div>
+            <div class="f" style="font-size:13px;font-weight:700">Alert me about
+              <div class="checks" id="types"></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center"><button class="btn primary" type="submit">Save</button><span class="hint" id="prefs-msg"></span></div>
+          </form>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-h"><h2>Alerts</h2><span class="hint">Local outbox</span></div>
+        <div class="panel-b notes" id="notes"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <div class="panel-h"><h2>Opportunity feed</h2><span class="hint" id="feed-time"></span></div>
+        <div class="panel-b" style="display:grid;gap:14px">
+          <div class="filters">
+            <label class="f grow">Search <input type="search" id="q" placeholder="Artist, event, venue"></label>
+            <label class="f">City <select id="city"><option value="">All</option></select></label>
+            <label class="f">Source <select id="source"><option value="">All</option></select></label>
+            <label class="toggle"><input type="checkbox" id="only"> Matches only</label>
+          </div>
+          <div class="feed" id="feed"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-h"><h2>Source health</h2><span class="hint">Developer view · also at <a href="/api/health">/api/health</a></span></div>
+        <div class="panel-b scroll"><table id="sources"></table></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<dialog id="detail"><div class="dlg-h"><div id="d-head"></div><button class="btn" id="d-close">Close</button></div><div class="dlg-b" id="d-body"></div></dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { headers: { 'content-type': 'application/json' }, ...opts });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || res.statusText);
+  return data;
+};
+const TYPES = { new_event: 'New events', on_sale: 'General sale times', presale: 'Presales', status: 'Published status', price: 'Prices', date_venue: 'Date / venue', cancellation: 'Cancellations', tiers: 'Ticket tiers' };
+const AVAIL = { on_sale: ['On sale', 'ok'], not_yet_on_sale: ['Not yet on sale', 'warn'], limited: ['Limited', 'warn'], sold_out: ['Sold out', 'bad'], off_sale: ['Off sale', 'bad'], unknown: ['Status unknown', ''] };
+const STATE = { healthy: 'ok', degraded: 'warn', stale: 'warn', parse_error: 'bad', blocked: 'bad', rate_limited: 'bad', challenge_detected: 'bad', disabled: '', awaiting_configuration: '' };
+const fmt = (iso, tz = 'Europe/London') => iso ? new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(new Date(iso)) : '—';
+const ago = iso => { if (!iso) return 'never'; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+const money = (v, c) => v == null ? null : new Intl.NumberFormat('en-GB', { style: 'currency', currency: c || 'GBP' }).format(v);
+const origin = o => o === 'live' ? '<span class="chip live">Live observation</span>' : o === 'manual' ? '<span class="chip">Manually supplied</span>' : '<span class="chip sample">Sample</span>';
+
+function statusChip(e) {
+  const st = e.field_meta?.published_availability_status?.state;
+  if (st === 'uncertain') return '<span class="chip warn" title="The source gave conflicting values; the last valid value is kept">Status conflicting</span>';
+  if (!e.published_availability_status) return '<span class="chip" title="The source did not publish an availability status">Status not published</span>';
+  const [label, cls] = AVAIL[e.published_availability_status] ?? [e.published_availability_status, ''];
+  return `<span class="chip ${cls}" title="Published by the source when last observed. Not a live availability check.">Published: ${esc(label)}</span>`;
+}
+function priceText(e) {
+  if (e.minimum_price == null) return '<span class="meta">Price not published</span>';
+  const lo = money(e.minimum_price, e.currency), hi = money(e.maximum_price, e.currency);
+  return `<span class="price">${esc(lo)}${hi && hi !== lo ? '–' + esc(hi) : ''}</span>`;
+}
+function describe(c) {
+  const cur = c.currency ?? 'GBP';
+  const v = x => {
+    if (x == null) return '—';
+    if (typeof x === 'object') {
+      if (x.min !== undefined) return x.min === x.max ? money(x.min, cur) ?? '—' : `${money(x.min, cur) ?? '—'}–${money(x.max, cur) ?? '—'}`;
+      if (x.name !== undefined) return [x.price != null ? money(x.price, x.currency) : null, (x.status ?? '').replace(/_/g, ' ')].filter(Boolean).join(', ');
+      return x.title ?? '';
+    }
+    if (typeof x === 'number' && /price/.test(c.kind + c.field)) return money(x, cur);
+    if (/^\d{4}-\d\d-\d\dT/.test(x)) return fmt(x);
+    return String(x).replace(/_/g, ' ');
+  };
+  const label = c.field === 'minimum_price' ? 'lowest price changed' : c.field === 'maximum_price' ? 'highest price changed' : c.kind.replace(/_/g, ' ');
+  if (c.kind === 'new_event') return `<b>${esc(label)}</b>`;
+  if (c.kind === 'tier_added') return `<b>${esc(c.tier)}: new ticket type</b> ${esc(v(c.current))}`;
+  if (c.kind === 'tier_not_listed') return `<b>${esc(c.tier)}: not listed in latest observation</b>`;
+  return `<b>${esc(c.tier ? `${c.tier}: ` : '')}${esc(label)}</b> ${esc(v(c.previous))} → ${esc(v(c.current))}`;
+}
+
+let state = { user: 'demo', prefs: null, sources: [] };
+
+async function loadPrefs() {
+  const p = state.prefs = await api(`/api/users/${state.user}`);
+  const f = $('#prefs');
+  for (const k of ['artists', 'teams', 'venues', 'categories']) f[k].value = p.follows[k].join(', ');
+  f.cities.value = p.cities.join(', ');
+  f.date_from.value = p.date_from ? p.date_from.slice(0, 10) : '';
+  f.date_to.value = p.date_to ? p.date_to.slice(0, 10) : '';
+  f.max_price.value = p.max_price ?? '';
+  f.currency.value = p.currency;
+  $('#types').innerHTML = Object.entries(TYPES).map(([k, l]) => `<label><input type="checkbox" value="${k}" ${p.notify_types.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('');
+}
+$('#prefs').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const f = ev.target;
+  const body = {
+    follows: { artists: f.artists.value, teams: f.teams.value, venues: f.venues.value, categories: f.categories.value },
+    cities: f.cities.value, date_from: f.date_from.value || null, date_to: f.date_to.value || null,
+    max_price: f.max_price.value === '' ? null : f.max_price.value, currency: f.currency.value,
+    notify_types: [...document.querySelectorAll('#types input:checked')].map(i => i.value),
+  };
+  try { await api(`/api/users/${state.user}`, { method: 'PUT', body: JSON.stringify(body) }); $('#prefs-msg').textContent = 'Saved. Applies to new alerts.'; refresh(); }
+  catch (e) { $('#prefs-msg').textContent = e.message; }
+});
+
+async function refresh() {
+  const qs = new URLSearchParams({ user: state.user, q: $('#q').value, city: $('#city').value, source: $('#source').value, only_matching: $('#only').checked ? '1' : '' });
+  const [feed, health, notes, sources] = await Promise.all([api('/api/feed?' + qs), api('/api/health'), api(`/api/notifications?user=${state.user}`), api('/api/sources')]);
+  state.sources = sources;
+  $('#t-events').textContent = feed.total;
+  $('#t-changes').textContent = health.counts.changes;
+  $('#t-notes').textContent = health.counts.notifications;
+  $('#t-supp').textContent = health.counts.suppressed;
+  $('#feed-time').textContent = `Updated ${new Date(feed.generated_at).toLocaleTimeString('en-GB')}`;
+  $('#demo-panel').hidden = !health.dev_routes;
+  const anySample = feed.items.some(i => i.events.some(e => e.data_origin === 'fixture'));
+  $('#sample-banner').hidden = !anySample;
+
+  const cities = new Set(); const srcs = new Set();
+  feed.items.forEach(i => i.events.forEach(e => { if (e.city) cities.add(e.city); srcs.add(e.source); }));
+  fillSelect('#city', [...cities].sort());
+  fillSelect('#source', sources.map(s => s.source), sources.map(s => s.name));
+
+  $('#feed').innerHTML = feed.items.length ? feed.items.map(card).join('') : '<div class="empty">No events match. Change the filters, or load observations.</div>';
+  $('#notes').innerHTML = notes.length ? notes.map(n => `<div class="note"><b>${esc(n.title)}</b>${n.lines.map(l => `<div>${esc(l)}</div>`).join('')}<small>Observed ${esc(fmt(n.observed_at))} · ${n.data_origin === 'fixture' ? 'sample data · ' : ''}<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">official page</a></small></div>`).join('') : '<div class="empty">No alerts yet.</div>';
+  $('#health-summary').innerHTML = sources.map(s => `<span class="chip ${STATE[s.state] ?? ''}" title="${esc(s.name)}: ${esc(s.state)}${s.last_origin === 'fixture' ? ' (from sample data)' : ''}">${esc(s.name)} · ${esc(s.state.replace(/_/g, ' '))}${s.last_origin === 'fixture' ? ' (sample)' : ''}</span>`).join('');
+  $('#sources').innerHTML = `<tr><th>Source</th><th>State</th><th>Live retrieval</th><th>Last attempt</th><th>Last valid parse</th><th>Data observed</th><th>Fails</th><th>Data from</th><th>Parser</th><th>Checked against</th></tr>` + sources.map(s => `<tr>
+    <td><b>${esc(s.name)}</b></td>
+    <td><span class="chip ${STATE[s.state] ?? ''}">${esc(s.state.replace(/_/g, ' '))}</span>${s.paused ? `<div class="hint">paused until ${esc(fmt(s.paused_until))}</div>` : ''}${s.last_classification && s.last_classification !== 'ok' ? `<div class="hint">last: ${esc(s.last_classification)}${s.last_evidence?.[0] ? ' · ' + esc(s.last_evidence[0]) : ''}</div>` : ''}${s.last_errors?.length ? `<div class="hint">${esc(s.last_errors[0])}</div>` : ''}</td>
+    <td>${esc(s.live_retrieval.replace(/_/g, ' '))}<div class="hint">${esc(s.access.method.replace(/_/g, ' '))}</div></td>
+    <td class="mono">${esc(ago(s.last_attempt_at))}</td>
+    <td class="mono">${esc(ago(s.last_valid_parse_at))}</td>
+    <td class="mono">${esc(ago(s.last_data_observed_at))}</td>
+    <td class="mono">${s.consecutive_failures}</td>
+    <td>${s.last_origin ? origin(s.last_origin) : '—'}</td>
+    <td class="mono">${esc(s.parser_version)}</td>
+    <td class="hint">${esc(s.verification)}</td></tr>`).join('');
+}
+function fillSelect(sel, values, labels = values) {
+  const el = $(sel), cur = el.value;
+  el.innerHTML = '<option value="">All</option>' + values.map((v, i) => `<option value="${esc(v)}">${esc(labels[i])}</option>`).join('');
+  el.value = values.includes(cur) ? cur : '';
+}
+function card(item) {
+  const e = item.events[0];
+  const m = item.match;
+  const others = item.events.slice(1);
+  return `<article class="card ${m && !m.match ? 'nomatch' : ''}">
+    <div class="card-top"><div><h3>${esc(e.title)}</h3><div class="meta">${esc([e.venue_name, e.city].filter(Boolean).join(', ') || 'Venue not published')} · ${esc(fmt(e.start_at, e.timezone))}</div></div>${priceText(e)}</div>
+    <div class="chips">${statusChip(e)}
+      ${e.published_presale_at ? `<span class="chip">Presale ${esc(fmt(e.published_presale_at, e.timezone))}</span>` : ''}
+      ${e.published_on_sale_at ? `<span class="chip" title="Earliest published on-sale or release time">On sale from ${esc(fmt(e.published_on_sale_at, e.timezone))}</span>` : ''}
+      ${e.cancellation_status && e.cancellation_status !== 'scheduled' ? `<span class="chip bad">${esc(e.cancellation_status)}</span>` : ''}
+      ${e.freshness === 'stale' ? '<span class="chip warn" title="Not observed within the freshness window">Stale</span>' : ''}
+      ${origin(e.data_origin)}</div>
+    <div class="chips">${item.events.map(x => `<span class="chip src">${esc(x.source_name)}</span>`).join('')}<span class="meta">observed ${esc(ago(e.last_successful_observation_at))} · confidence ${Math.round(e.data_confidence * 100)}%</span>
+      ${m ? `<span class="meta">· ${m.match ? esc(m.reasons.slice(0, 2).join(', ') || 'matches your filters') : 'not matched: ' + esc(m.excluded)}</span>` : ''}</div>
+    ${item.latest_changes.length ? `<div class="changes">${item.latest_changes.map(c => `<div>${describe(c)} <span class="hint">· ${esc(ago(c.observed_at))}${c.notify_eligible ? '' : ' · not alerted: ' + esc(c.ineligible_reason)}</span></div>`).join('')}</div>` : ''}
+    <div class="chips">${item.events.map(x => `<button class="linkbtn" data-id="${esc(x.id)}">Details${others.length ? ` (${esc(x.source_name)})` : ''}</button> <a href="${esc(x.canonical_url)}" target="_blank" rel="noopener noreferrer">Official ${esc(x.source_name)} page ↗</a>`).join(' · ')}</div>
+  </article>`;
+}
+
+async function openDetail(id) {
+  const d = await api('/api/events/' + encodeURIComponent(id));
+  const e = d.event;
+  $('#d-head').innerHTML = `<div class="k">${esc(e.source_name)} · ${esc(e.source_event_id)}</div><h2 style="font-size:18px;margin-top:4px">${esc(e.title)}</h2><div class="chips" style="margin-top:6px">${statusChip(e)}${origin(e.data_origin)}${e.freshness === 'stale' ? '<span class="chip warn">Stale</span>' : ''}<a href="${esc(e.canonical_url)}" target="_blank" rel="noopener noreferrer">Official page ↗</a></div>`;
+  const fields = ['start_at', 'end_at', 'venue_name', 'city', 'country', 'minimum_price', 'maximum_price', 'currency', 'published_availability_status', 'published_on_sale_at', 'published_presale_at', 'announced_at', 'cancellation_status', 'artists', 'categories'];
+  const show = (k, v) => v == null ? '—' : Array.isArray(v) ? v.join(', ') : /_at$/.test(k) ? fmt(v, e.timezone) : /_price$/.test(k) ? money(v, e.currency) : String(v).replace(/_/g, ' ');
+  const stCls = { confirmed: 'ok', stale: 'warn', uncertain: 'warn', missing: '', unavailable: '', unknown: '' };
+  const stLabel = { confirmed: 'confirmed', stale: 'stale', uncertain: 'conflicting', missing: 'not published', unavailable: 'not available from this source', unknown: 'unknown' };
+  $('#d-body').innerHTML = `
+    <div><h4>Fields</h4><div class="scroll"><table><tr><th>Field</th><th>Value</th><th>State</th><th>Last confirmed</th><th>From</th></tr>
+      ${fields.map(k => { const m = e.field_meta?.[k] ?? { state: 'unknown' }; return `<tr><td class="mono">${k}</td><td>${esc(show(k, e[k]))}</td><td><span class="chip ${stCls[m.state] ?? ''}">${esc(stLabel[m.state] ?? m.state)}</span>${m.note ? `<div class="hint">${esc(m.note)}</div>` : ''}</td><td class="mono">${esc(m.confirmed_at ? fmt(m.confirmed_at) : '—')}</td><td class="hint">${esc(m.via ?? '')}</td></tr>`; }).join('')}
+    </table></div><p class="hint">Ticket quantities are never shown: no source in this build publishes them. A published status is what the source said at the observation time, not a live availability check.</p></div>
+    <div><h4>Ticket tiers</h4>${d.tiers.length ? `<div class="scroll"><table><tr><th>Tier</th><th>Price</th><th>Published status</th><th>Release</th><th>Listed</th></tr>${d.tiers.map(t => `<tr><td>${esc(t.name)}</td><td class="mono">${esc(money(t.price, t.currency) ?? '—')}</td><td>${esc(t.status.replace(/_/g, ' '))}</td><td class="mono">${esc(t.release_at ? fmt(t.release_at, e.timezone) : '—')}</td><td>${t.listed ? 'yes' : `<span class="hint">${esc(t.status_note)}</span>`}</td></tr>`).join('')}</table></div>` : '<div class="empty">This source does not publish ticket tiers through the method used.</div>'}</div>
+    ${d.quarantined.length ? `<div><h4>Quarantined tiers (not used)</h4><div class="scroll"><table><tr><th>Tier</th><th>Reason</th></tr>${d.quarantined.map(q => `<tr><td>${esc(q.tier.name)} <span class="mono hint">${esc(q.tier.source_tier_id)}</span></td><td>${esc(q.reason)}</td></tr>`).join('')}</table></div></div>` : ''}
+    ${d.also_listed_on.length ? `<div><h4>Also listed on</h4>${d.also_listed_on.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.source)}</a>`).join(' · ')}</div>` : ''}
+    <div><h4>Status and release history</h4><div class="timeline">${d.changes.length ? d.changes.map(c => `<div><span class="mono hint">${esc(fmt(c.observed_at))}</span><span>${describe(c)} ${c.notify_eligible ? '<span class="chip ok">alert-eligible</span>' : `<span class="hint">not alerted: ${esc(c.ineligible_reason)}</span>`}</span></div>`).join('') : '<div class="empty">No changes yet.</div>'}</div></div>
+    <div><h4>Observations</h4><div class="timeline">${d.observations.map(o => `<div><span class="mono hint">${esc(fmt(o.observed_at))}</span><span>${esc(o.classification)} / ${esc(o.status)} · ${origin(o.origin)} ${esc((o.events.find(x => x.event_id === e.id) ?? {}).outcome ?? '')}</span></div>`).join('')}</div></div>
+    ${e.warnings?.length ? `<div><h4>Parser notes</h4><ul class="hint" style="margin:0;padding-left:18px">${e.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}`;
+  $('#detail').showModal();
+}
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-id]'); if (b) openDetail(b.dataset.id); });
+$('#d-close').addEventListener('click', () => $('#detail').close());
+for (const id of ['#q', '#city', '#source', '#only']) $(id).addEventListener(id === '#q' ? 'input' : 'change', () => refresh());
+$('#next-step').addEventListener('click', async () => {
+  const b = $('#next-step'); b.disabled = true;
+  try {
+    const r = await api('/api/dev/next-step', { method: 'POST' });
+    if (r.done) { $('#demo-out').textContent = 'All demo observations replayed.'; return; }
+    const o = r.observation;
+    $('#demo-out').innerHTML = `<b>Step ${r.step}/${r.of}:</b> ${esc(r.explains)} → <span class="mono">${esc(o.classification)}/${esc(o.status)}</span>, ${r.changes.length} change(s), ${r.notifications.length} alert(s).`;
+    await refresh();
+  } catch (e) { $('#demo-out').textContent = e.message; }
+  finally { b.disabled = false; }
+});
+loadPrefs().then(refresh);
+setInterval(refresh, 20000);
+</script>
+</body>
+</html>
