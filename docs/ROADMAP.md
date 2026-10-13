@@ -29,6 +29,7 @@ this is not an API-integration project.
 | --- | --- | --- |
 | 1 | Keep Fatsoma running locally and prove real change detection | A genuine release, price change or sell-out on a live page produces exactly one correct alert, with no false alerts or duplicates |
 | 2 | Release-time-aware checking (alert-speed priority) | Checks cluster around published release times within the existing per-site request limits; no blanket increase in polling |
+| 2b | Faster Fatsoma detection | See [PLAN_FATSOMA_DETECTION.md](PLAN_FATSOMA_DETECTION.md): organiser pages, signal-driven timing, email-push test, then targeted bursts |
 | 3 | Adapter self-checks | Saved real-page fixtures catch parsing regressions, and a clear alert fires when a live adapter stops extracting expected data |
 | 4 | Alternative change signals | Live page updates, platform notification emails and sitemaps assessed; any adopted signal is a module feeding the existing engine |
 | 5 | Skiddle as second live source, then DICE validated on a real page | Each adapter passes its fixtures **and** live checks before it is called working |
