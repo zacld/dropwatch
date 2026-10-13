@@ -14,6 +14,9 @@
 //   node monitor/cli.js release-report [--hours 48]
 //       Read-only: requests made per site and kind, and each release window's checks, outcomes and how many
 //       minutes after the release the first change was detected. Safe while the monitor is running.
+//   node monitor/cli.js detection-report [--hours 48] [--all]
+//       Read-only: each alerted change (--all: also recorded-only changes) with the window it appeared in, which
+//       check found it and why that check ran (signal, rotation, release window), and the alert time.
 import { loadDotEnv, loadConfig } from './config.js';
 import { createLogger } from './log.js';
 import { createMonitorApp } from './app.js';
@@ -23,6 +26,7 @@ import { createMonitorStore } from './store.js';
 import { createEngine } from './engine.js';
 import { defaultPreferences } from './preferences.js';
 import { releaseReport } from './scheduler.js';
+import { detectionReport } from './reports.js';
 import { join } from 'node:path';
 
 loadDotEnv();
@@ -30,7 +34,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 const opt = name => { const i = rest.indexOf(`--${name}`); return i >= 0 ? rest[i + 1] : undefined; };
 const config = loadConfig(process.env, { scheduler: { enabled: false, tickSeconds: 60 } });
 const log = createLogger({ level: config.logLevel, base: { svc: 'monitor-cli' }, sink: l => process.stderr.write(l + '\n') });
-const app = ['compare', 'release-report'].includes(cmd) ? null : createMonitorApp({ config, log });
+const app = ['compare', 'release-report', 'detection-report'].includes(cmd) ? null : createMonitorApp({ config, log });
 const print = v => console.log(JSON.stringify(v, null, 2));
 const brief = r => ({
   observation: { id: r.observation.id, classification: r.observation.classification, status: r.observation.status, outcome: r.observation.outcome, events: r.observation.events, errors: r.observation.errors },
@@ -89,8 +93,21 @@ if (cmd === 'ingest') {
     console.log(`\n  ${w.source} ${t?.target ?? w.target_id}\n  release ${w.release_at}  first change detected: ${w.first_change_minutes_after_release === null ? 'none' : `+${w.first_change_minutes_after_release} min`}`);
     for (const s of w.slots) console.log(`    ${String(s.offset_minutes).padStart(4)} min  ${s.at}  ${s.requested ? 'sent   ' : 'no req '} ${s.outcome}${s.changes.length ? `  changes: ${s.changes.join(', ')}` : ''}${s.alerts ? `  alerts: ${s.alerts}` : ''}`);
   }
+} else if (cmd === 'detection-report') {
+  // Read-only: loads the store but never saves it.
+  const db = createMonitorStore(join(config.dataDir, 'monitor.json')).data;
+  const hours = Number(opt('hours') ?? 48);
+  const rows = detectionReport(db, { sinceMs: Date.now() - hours * 3_600_000, includeRecordOnly: rest.includes('--all') });
+  console.log(`Signal priority: ${config.signals.enabled ? 'ON' : 'off'} | changes in the last ${hours} h: ${rows.length}`);
+  for (const r of rows) {
+    console.log(`\n  ${r.observed_at}  ${r.title ?? r.event_id}`);
+    console.log(`    ${r.kind}${r.tier ? ` [${r.tier}]` : ''}: ${JSON.stringify(r.previous)} → ${JSON.stringify(r.current)}`);
+    console.log(`    appeared between ${r.appeared_after ?? '(first observation)'} and ${r.observed_at}${r.window_minutes !== null ? ` (${r.window_minutes} min window)` : ''}`);
+    console.log(`    found by: ${r.found_by.kind}${r.found_by.reason ? ` (${r.found_by.reason})` : ''}${r.found_by.cache_status ? `, cache ${r.found_by.cache_status}` : ''}`);
+    console.log(`    ${r.alerted_at ? `alerted ${r.alerted_at} (+${r.alert_delay_seconds} s)` : `not alerted${r.ineligible_reason ? `: ${r.ineligible_reason}` : ''}`}`);
+  }
 } else if (cmd === 'status') {
   print(app.engine.sourcesView().map(s => ({ source: s.source, state: s.state, enabled: s.enabled, live: s.live_retrieval, last_success_at: s.last_success_at, last_origin: s.last_origin, failures: s.consecutive_failures, paused_until: s.paused_until })));
 } else {
-  console.log('commands: ingest | fixture | fetch | status | compare | release-report   (see the top of monitor/cli.js)');
+  console.log('commands: ingest | fixture | fetch | status | compare | release-report | detection-report   (see the top of monitor/cli.js)');
 }

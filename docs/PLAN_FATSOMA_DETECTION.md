@@ -1,6 +1,6 @@
 # Plan: faster Fatsoma detection
 
-Status: **Phase 1 built and tested** (13 Oct 2026); Phases 2–4 not started. Order agreed: (1) cover more per check, (2) check at the right
+Status: **Phases 1 and 2 built and tested** (13 Oct 2026); email test and bursts not started. Order agreed: (1) cover more per check, (2) check at the right
 moments, (4) test the email push, then (3) targeted bursts. Raising the baseline is a later decision, made only on
 evidence.
 
@@ -71,6 +71,19 @@ a quiet one); the hourly budget is never exceeded; signals never alert by themse
 
 **Expected effect:** changes that follow a visible signal are found at the next baseline slot instead of a random
 one. Without bursts, worst case is still ~1 h.
+
+### Phase 2 as built
+
+- `monitor/signals.js`: `sold_out_followup` (3, or 2 if another main tier is still on sale), `falling_count` (2,
+  2.5 if under ~2 h to sell out; needs a fall within 24 h, so a flat low count is never urgent), `release_soon`
+  (1.5), `event_soon` (1), `quiet` (−1). Add-ons never signal.
+- Scheduler (`DROPWATCH_SIGNAL_PRIORITY=on`): among due watches, score = strongest signal + intervals elapsed; a
+  watch 3 intervals overdue goes next regardless. Same one-request-per-hour budget.
+- Tier history (a point per status/count/price change, last 48) and `appeared_after` on every change.
+- Fatsoma release-window offsets −2, +2, +5, +15 (per-site setting; precedence: site, general, site default).
+- Request log `reason` and `observation_id`; `cli.js detection-report`.
+- Tests: `test/monitor-signals.test.js`; overdue cap, signal scoring and the falling-count rule each have a test
+  that fails without them.
 
 ## Phase 4 (done third): Fatsoma emails as a push trigger, test first
 

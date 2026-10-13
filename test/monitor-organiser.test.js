@@ -136,9 +136,9 @@ test('release windows apply to every event an organiser page lists', async () =>
   h.sch.addTarget({ source: 'fatsoma', target: ORG_URL, interval_minutes: 60 });
   await h.runUntil(R + 30 * MIN);
   const extra = h.s.db.request_log.filter(r => r.kind === 'release_window' && r.requested);
-  assert.deepEqual(extra.map(r => r.offset_minutes), [-2, 1, 5, 15]);
+  assert.deepEqual(extra.map(r => r.offset_minutes), [-2, 2, 5, 15]);
   const caught = extra.find(r => r.changes?.includes('tier_status_changed'));
-  assert.equal(caught?.offset_minutes, 1);
+  assert.equal(caught?.offset_minutes, 2);
   assert.equal(caught.alerts, 1);
 });
 

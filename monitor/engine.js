@@ -125,7 +125,12 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
       const nextIds = new Set(ev.tiers.map(x => x.source_tier_id));
       for (const tier of ev.tiers) {
         const key = `${id}|${tier.source_tier_id}`;
-        db.tiers[key] = { ...tier, event_id: id, source: connector.id, listed: true, first_seen_at: db.tiers[key]?.first_seen_at ?? obsRec.observed_at, last_seen_at: obsRec.observed_at };
+        // Short history for signals: a point whenever status, remaining count or price changes.
+        const history = [...(db.tiers[key]?.history ?? [])];
+        const point = { at: obsRec.observed_at, status: tier.status, qty: tier.quantity?.value ?? null, price: tier.price };
+        const lastPt = history[history.length - 1];
+        if (!lastPt || lastPt.status !== point.status || lastPt.qty !== point.qty || lastPt.price !== point.price) history.push(point);
+        db.tiers[key] = { ...tier, event_id: id, source: connector.id, listed: true, first_seen_at: db.tiers[key]?.first_seen_at ?? obsRec.observed_at, last_seen_at: obsRec.observed_at, history: history.slice(-48) };
       }
       for (const p of prevTiers) if (!nextIds.has(p.source_tier_id)) Object.assign(db.tiers[`${id}|${p.source_tier_id}`], { listed: false, status_note: 'not listed in latest observation (not treated as sold out)' });
       db.quarantined[id] = ev.quarantined_tiers.map(q => ({ ...q, observed_at: obsRec.observed_at }));
@@ -144,6 +149,8 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
           observation_id: obsRec.id,
           observed_at: obsRec.observed_at,
           detected_at: new Date(t).toISOString(),
+          // The change became visible after the previous valid observation and by this one.
+          appeared_after: prev?.last_successful_observation_at ?? null,
           ...d,
           confidence: ev.confidence,
           notify_eligible: el.eligible,

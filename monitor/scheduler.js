@@ -2,6 +2,7 @@ import { connectorById } from './connectors/index.js';
 import { retrieveLive } from './retrieve.js';
 import { nextAllowedAttempt } from './health.js';
 import { MIN_INTERVAL_MINUTES } from './config.js';
+import { watchPriority } from './signals.js';
 
 // Conservative polling of configured targets. Off unless DROPWATCH_SCHEDULER=on, and then only for sources
 // whose live retrieval is switched on. At most one request per tick, never faster than the source interval
@@ -84,7 +85,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
       const r = Date.parse(R);
       if (r < t - 24 * HOUR || r > t + 24 * HOUR) continue;
       const done = Object.entries(target.release_checks).filter(([k, v]) => k.startsWith(`${R}|`) && v.requested).length;
-      for (const off of rw.offsetsMinutes) {
+      for (const off of rw.offsetsBySource?.[target.source] ?? rw.offsetsMinutes) {
         const at = r + off * MIN;
         const key = `${R}|${off}`;
         if (target.release_checks[key] || t < at) continue;
@@ -112,6 +113,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     const obs = await retrieveLive(c, target.target, config, { fetchImpl, now, log });
     const entry = {
       at: iso(t0), source: target.source, target_id: target.id, target_kind: target.kind ?? 'event', kind: meta.kind,
+      reason: meta.reason ?? (meta.kind === 'release_window' ? `release ${meta.R} ${meta.off >= 0 ? '+' : ''}${meta.off} min` : 'rotation'),
       release_at: meta.R ?? null, offset_minutes: meta.off ?? null,
       minutes_after_release: meta.R ? Math.round((t0 - Date.parse(meta.R)) / 6000) / 10 : null,
       requested: !obs.refused,
@@ -132,6 +134,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
       if (target.kind === 'organiser') { target.covers = r.events.map(e => e.id); target.covers_at = entry.at; }
     }
     Object.assign(entry, {
+      observation_id: r.observation.id,
       http_status: obs.status ?? null,
       outcome: `${r.observation.classification}/${r.observation.status}`,
       duration_ms: Math.round(performance.now() - started),
@@ -185,13 +188,30 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     // 2. Normal monitoring: unchanged rules, plus the hard site budget and minimum gap. When several targets on
     // one site are due, the most overdue goes first (never-checked targets first, then in list order), so a
     // site's single hourly slot rotates fairly instead of always going to the first target in the list.
+    // With signal priority on (DROPWATCH_SIGNAL_PRIORITY=on), the due watch whose events show the strongest
+    // signal goes first instead; a watch overdue by maxOverdueIntervals is taken regardless, so none starves.
     const dueAt = target => (target.last_run_at ? Date.parse(target.last_run_at) : 0) + target.interval_minutes * MIN;
-    const due = live.filter(({ target }) => t >= dueAt(target)).sort((a, b) => dueAt(a.target) - dueAt(b.target));
-    for (const { target, c, src } of due) {
+    let due = live.filter(({ target }) => t >= dueAt(target)).sort((a, b) => dueAt(a.target) - dueAt(b.target));
+    const sig = config.signals;
+    if (sig?.enabled && due.length) {
+      const tiersOf = id => Object.values(db.tiers).filter(x => x.event_id === id);
+      due = due.map(x => {
+        const interval = x.target.interval_minutes * MIN;
+        const elapsed = x.target.last_run_at ? t - Date.parse(x.target.last_run_at) : Infinity;
+        const overdue = elapsed >= sig.maxOverdueIntervals * interval;
+        const p = watchPriority(eventsFor(x.target), tiersOf, t, sig);
+        const score = overdue ? 1e6 + Math.min(elapsed, 1e12) / interval : p.strength + elapsed / interval;
+        const reason = overdue
+          ? (x.target.last_run_at ? `overdue: not checked for ${Math.round(elapsed / MIN)} min` : 'first check')
+          : p.signals.length ? p.signals.map(s => `${s.type}: ${s.reason}`).join('; ') : 'rotation';
+        return { ...x, score, reason, signals: p.signals.map(s => s.type) };
+      }).sort((a, b) => b.score - a.score || dueAt(a.target) - dueAt(b.target));
+    }
+    for (const { target, c, src, reason } of due) {
       const h = db.sources[target.source];
       if (t < nextAllowedAttempt(h, src.intervalMinutes)) continue;
       if (inLastHour(target.source, t) >= siteCap() || !gapOk(target.source, t)) continue;
-      return request(target, c, { kind: 'scheduled' });
+      return request(target, c, { kind: 'scheduled', reason });
     }
     return { ran: null, reason: 'nothing due' };
   }

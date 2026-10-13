@@ -42,23 +42,23 @@ function harness({ env = {}, respond } = {}) {
 const rel = log => log.filter(r => r.kind === 'release_window');
 const minutesFromR = t => Math.round((t - R) / MIN);
 
-test('release window: checks at -2, +1, +5 and +15 min; the release is detected at +1 and alerted once', async () => {
+test('release window (Fatsoma offsets): checks at -2, +2, +5 and +15 min; the release is detected at +2 and alerted once', async () => {
   const h = harness();
   await h.runUntil(R + 2 * HOUR);
 
   const extra = rel(h.log()).filter(r => r.requested);
-  assert.deepEqual(extra.map(r => r.offset_minutes), [-2, 1, 5, 15]);
-  assert.deepEqual(extra.map(r => minutesFromR(Date.parse(r.at))), [-2, 1, 5, 15], 'each check lands on its slot (1-minute ticks)');
+  assert.deepEqual(extra.map(r => r.offset_minutes), [-2, 2, 5, 15], 'Fatsoma: +2, past its ~2-min cache');
+  assert.deepEqual(extra.map(r => minutesFromR(Date.parse(r.at))), [-2, 2, 5, 15], 'each check lands on its slot (1-minute ticks)');
 
   const [before, after1, after5, after15] = extra;
   assert.deepEqual(before.changes, [], 'the pre-release check refreshes the baseline');
-  assert.ok(after1.changes.includes('tier_status_changed'), 'the release is caught at +1 min');
+  assert.ok(after1.changes.includes('tier_status_changed'), 'the release is caught at +2 min');
   assert.equal(after1.alerts, 1);
   assert.deepEqual([after5.alerts, after15.alerts], [0, 0], 'later checks do not repeat the alert');
 
   const report = releaseReport(h.log());
   assert.equal(report.length, 1);
-  assert.equal(report[0].first_change_minutes_after_release, 1);
+  assert.equal(report[0].first_change_minutes_after_release, 2);
   assert.equal(h.s.sent.filter(n => n.kinds.includes('tier_status_changed')).length, 1);
 });
 
@@ -104,9 +104,9 @@ test('the minimum gap between requests delays a release check (within its tolera
   await h.runUntil(R + 30 * MIN);
   for (let i = 1; i < h.calls.length; i++) assert.ok(h.calls[i] - h.calls[i - 1] >= 5 * MIN, `requests ${(h.calls[i] - h.calls[i - 1]) / MIN} min apart`);
   const extra = rel(h.log());
-  // -2 runs at R-2; +1 waits for the gap until R+3 (still within 3 min of its slot); +5 would need R+8 = its
-  // slot + 3: still inside tolerance, so it runs then.
-  assert.deepEqual(extra.filter(r => r.requested).map(r => [r.offset_minutes, minutesFromR(Date.parse(r.at))]), [[-2, -2], [1, 3], [5, 8], [15, 15]]);
+  // -2 runs at R-2; +2 waits for the 5-min gap until R+3 (1 min after its slot, within tolerance); +5 then waits
+  // until R+8 (its slot + 3: still inside tolerance).
+  assert.deepEqual(extra.filter(r => r.requested).map(r => [r.offset_minutes, minutesFromR(Date.parse(r.at))]), [[-2, -2], [2, 3], [5, 8], [15, 15]]);
 });
 
 test('slots missed while the PC slept are logged as missed, never fired late', async () => {
@@ -115,7 +115,7 @@ test('slots missed while the PC slept are logged as missed, never fired late', a
   h.s.clock.t = R + 10 * MIN;            // asleep from 09:00 to 14:10
   await h.runUntil(R + 20 * MIN);
   const extra = rel(h.log());
-  assert.deepEqual(extra.filter(r => r.outcome.startsWith('missed')).map(r => r.offset_minutes), [-2, 1, 5]);
+  assert.deepEqual(extra.filter(r => r.outcome.startsWith('missed')).map(r => r.offset_minutes), [-2, 2, 5]);
   assert.deepEqual(extra.filter(r => r.requested).map(r => r.offset_minutes), [15]);
 });
 

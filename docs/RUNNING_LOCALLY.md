@@ -85,6 +85,24 @@ curl -X POST http://127.0.0.1:4200/api/targets -H "content-type: application/jso
   cancelled or sold out.
 - All watches on one site share its hourly slot in rotation, most overdue first.
 
+## Signal priority (which watch is checked next)
+
+With `DROPWATCH_SIGNAL_PRIORITY=on`, when several watches on a site are due, the one whose events show the
+strongest signal is checked first: a tier that just sold out (the next wave often follows), a remaining count
+that is falling towards zero, a published release within a few hours, or an event starting within 72 hours.
+Events with no ticket change for days are checked last. Signals never send alerts and never add requests: the
+site still gets one request per hour, and any watch 3 intervals overdue is checked next regardless.
+
+Each request's reason is in the request log. To see what was found, when, and why that check ran:
+
+```
+node monitor/cli.js detection-report --hours 48
+```
+
+Each alerted change is listed with the window it appeared in (between the previous check and the one that found
+it), the check that found it and its reason, the cache status, and when the alert was sent. `--all` also lists
+recorded-only changes. Read-only.
+
 ## Release windows (faster alerts around known releases)
 
 With `DROPWATCH_RELEASE_WINDOW=on`, a watched event whose page publishes a release time (a tier's on-sale
