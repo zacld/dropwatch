@@ -103,6 +103,30 @@ Each alerted change is listed with the window it appeared in (between the previo
 it), the check that found it and its reason, the cache status, and when the alert was sent. `--all` also lists
 recorded-only changes. Read-only.
 
+## Bursts and triggers (minutes-level checks after a sign)
+
+With `DROPWATCH_SIGNAL_BURSTS=on`, a check that finds a main ticket tier has just sold out, or a remaining count
+heading to zero within 2 hours, arms extra checks of the same page at +2, +5 and +15 minutes: the next wave usually
+opens soon after. External triggers do the same from outside, starting with an immediate check:
+
+```
+node monitor/cli.js trigger --url <event page url> --reason "email said tickets are on sale"
+node monitor/cli.js trigger --email saved-message.eml
+```
+
+(`trigger` goes through the running monitor's API, `POST /api/triggers`, so only one process writes the data.)
+
+Rules: a trigger never alerts by itself (only a page check that finds a real change does); one active trigger per
+type per watch; all extra checks, bursts and release windows together, share `DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR`
+(default 4) per site; no extra checks while the site is backing off or paused; the minimum gap still applies.
+
+```
+node monitor/cli.js trigger-report --hours 48
+```
+
+lists every trigger, the checks it caused, the first change they found and how many minutes after the trigger, and
+for email triggers whether the page had already shown a change before the email arrived.
+
 ## Release windows (faster alerts around known releases)
 
 With `DROPWATCH_RELEASE_WINDOW=on`, a watched event whose page publishes a release time (a tier's on-sale

@@ -2,7 +2,7 @@ import { connectorById } from './connectors/index.js';
 import { retrieveLive } from './retrieve.js';
 import { nextAllowedAttempt } from './health.js';
 import { MIN_INTERVAL_MINUTES } from './config.js';
-import { watchPriority } from './signals.js';
+import { watchPriority, eventSignals } from './signals.js';
 
 // Conservative polling of configured targets. Off unless DROPWATCH_SCHEDULER=on, and then only for sources
 // whose live retrieval is switched on. At most one request per tick, never faster than the source interval
@@ -21,7 +21,10 @@ const iso = ms => new Date(ms).toISOString();
 export function createScheduler({ store, engine, config, now = () => Date.now(), log, fetchImpl }) {
   const db = store.data;
   db.request_log ??= [];
+  db.trigger_log ??= [];
   const rw = config.releaseWindow ?? { enabled: false, offsetsMinutes: [], maxChecksPerRelease: 0, maxExtraPerSitePerHour: 0, slotToleranceMinutes: 3 };
+  const bc = config.bursts ?? { enabled: false, offsetsMinutes: [], externalOffsetsMinutes: [], maxChecksPerTrigger: 0, fallingTriggerHours: 0 };
+  const EXTRA = new Set(['release_window', 'burst']); // extra checks: they share one per-site hourly allowance
   const minGap = (config.minRequestGapSeconds ?? 60) * 1000;
   let timer = null;
   let inFlight = false;
@@ -40,9 +43,9 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
 
   // ---- request accounting (requests actually sent; refusals and missed slots are not requests) ----
   const sent = source => db.request_log.filter(r => r.source === source && r.requested);
-  const inLastHour = (source, t, kind) => sent(source).filter(r => Date.parse(r.at) > t - HOUR && (!kind || r.kind === kind)).length;
+  const inLastHour = (source, t, kinds) => sent(source).filter(r => Date.parse(r.at) > t - HOUR && (!kinds || kinds.has(r.kind))).length;
   const lastRequestAt = source => { const s = sent(source); return s.length ? Date.parse(s[s.length - 1].at) : 0; };
-  const siteCap = () => 1 + (rw.enabled ? rw.maxExtraPerSitePerHour : 0);
+  const siteCap = () => 1 + (rw.enabled || bc.enabled ? rw.maxExtraPerSitePerHour : 0);
   const gapOk = (source, t) => t - lastRequestAt(source) >= minGap;
   const record = entry => { db.request_log.push(entry); log?.info('request', entry); };
 
@@ -106,6 +109,76 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     return best;
   }
 
+  // ---- burst triggers ----
+  // A trigger arms a few extra checks of one watch at fixed offsets after it. One active trigger per type per
+  // watch: a repeat while its slots are pending is ignored. Every trigger is logged in db.trigger_log.
+  function addTrigger(target, { type, reason, offsets, at, via = 'internal', event_id = null, received_at = null, log_id = null }) {
+    target.triggers ??= [];
+    const active = target.triggers.find(g => g.type === type && g.offsets.some(o => !g.done?.[o]));
+    if (active) return null;
+    const g = { id: log_id ?? store.nextId('trg'), type, reason, at: iso(at), offsets: [...offsets], done: {} };
+    target.triggers.push(g);
+    if (!log_id) db.trigger_log.push({ id: g.id, at: g.at, type, via, reason, target_id: target.id, event_id, received_at, armed: [target.id] });
+    return g;
+  }
+
+  // Internal triggers from what a check just found: a main tier sold out, or a count projected to run out soon.
+  function internalTriggers(target, result, t) {
+    if (!bc.enabled || !result?.changes) return;
+    const sold = result.changes.find(c => c.kind === 'tier_status_changed' && c.current === 'sold_out' && !c.addon);
+    if (sold) addTrigger(target, { type: 'sold_out', reason: `"${sold.tier}" sold out`, offsets: bc.offsetsMinutes, at: t, event_id: sold.event_id });
+    const tiersOf = id => Object.values(db.tiers).filter(x => x.event_id === id);
+    for (const ev of eventsFor(target)) {
+      const f = eventSignals(ev, tiersOf(ev.id), t, config.signals ?? {}).find(x => x.type === 'falling_count' && x.hours_to_zero <= bc.fallingTriggerHours);
+      if (!f) continue;
+      const recent = (target.triggers ?? []).some(g => g.type === 'falling_count' && t - Date.parse(g.at) < HOUR);
+      if (!recent) addTrigger(target, { type: 'falling_count', reason: f.reason, offsets: bc.offsetsMinutes, at: t, event_id: ev.id });
+      break;
+    }
+  }
+
+  // External trigger (e.g. a platform email): arm an immediate verification check on whichever enabled watch shows
+  // the event (its organiser page while that lists it, else its own event page). Logged even when nothing is armed.
+  function addExternalTrigger({ source = 'fatsoma', url = null, event_id = null, reason = 'external trigger', via = 'manual', received_at = null }) {
+    const t = now();
+    const ev = event_id ? db.events[event_id] ?? null : url ? Object.values(db.events).find(e => e.source === source && sameEventPage(e.canonical_url, url)) ?? null : null;
+    const shows = x => x.enabled && x.source === source && (x.kind === 'organiser'
+      ? !!ev && (x.covers ?? []).includes(ev.id)
+      : (!!url && sameEventPage(x.target, url)) || (!!ev && eventFor(x)?.id === ev.id));
+    const targets = db.targets.filter(shows).filter(x => x.kind === 'organiser' || !coveredBy(x));
+    const entry = { id: store.nextId('trg'), at: iso(t), type: 'external', via, reason, url, event_id: ev?.id ?? event_id, received_at, armed: [] };
+    if (!bc.enabled) entry.note = 'bursts are off: logged only';
+    else if (!targets.length) entry.note = 'no enabled watch shows this event: logged only';
+    else {
+      for (const target of targets) if (addTrigger(target, { type: 'external', reason, offsets: bc.externalOffsetsMinutes, at: t, via, event_id: ev?.id ?? null, received_at, log_id: entry.id })) entry.armed.push(target.id);
+      if (!entry.armed.length) entry.note = 'an external trigger for this watch is already active: logged only';
+    }
+    db.trigger_log.push(entry);
+    store.save();
+    log?.info('trigger', entry);
+    return entry;
+  }
+
+  // The earliest burst slot due now for this target, or null. Marks missed slots and the per-trigger limit.
+  function dueBurstSlot(target, t) {
+    target.triggers = (target.triggers ?? []).filter(g => t - Date.parse(g.at) <= 3 * HOUR);
+    let best = null;
+    for (const g of target.triggers) {
+      g.done ??= {};
+      const sentForTrigger = Object.values(g.done).filter(v => v.requested).length;
+      for (const off of g.offsets) {
+        if (g.done[off]) continue;
+        const at = Date.parse(g.at) + off * MIN;
+        if (t < at) continue;
+        const note = outcome => { g.done[off] = { outcome, at: iso(t) }; record({ at: iso(t), source: target.source, target_id: target.id, kind: 'burst', trigger_id: g.id, trigger_type: g.type, offset_minutes: off, requested: false, outcome }); };
+        if (t - at > rw.slotToleranceMinutes * MIN) { note(`missed: slot was due ${Math.round((t - at) / MIN)} min earlier`); continue; }
+        if (sentForTrigger >= bc.maxChecksPerTrigger) { note('skipped: per-trigger limit reached'); continue; }
+        if (!best || at < best.at) best = { trigger: g, off, at };
+      }
+    }
+    return best;
+  }
+
   async function request(target, c, meta) {
     const t0 = now();
     const started = performance.now();
@@ -113,8 +186,10 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     const obs = await retrieveLive(c, target.target, config, { fetchImpl, now, log });
     const entry = {
       at: iso(t0), source: target.source, target_id: target.id, target_kind: target.kind ?? 'event', kind: meta.kind,
-      reason: meta.reason ?? (meta.kind === 'release_window' ? `release ${meta.R} ${meta.off >= 0 ? '+' : ''}${meta.off} min` : 'rotation'),
-      release_at: meta.R ?? null, offset_minutes: meta.off ?? null,
+      reason: meta.reason ?? (meta.kind === 'release_window' ? `release ${meta.R} ${meta.off >= 0 ? '+' : ''}${meta.off} min`
+        : meta.kind === 'burst' ? `${meta.burst.trigger.type} trigger (${meta.burst.trigger.reason}) +${meta.burst.off} min` : 'rotation'),
+      release_at: meta.R ?? null, offset_minutes: meta.off ?? meta.burst?.off ?? null,
+      ...(meta.burst ? { trigger_id: meta.burst.trigger.id, trigger_type: meta.burst.trigger.type, minutes_after_trigger: Math.round((t0 - Date.parse(meta.burst.trigger.at)) / 6000) / 10 } : {}),
       minutes_after_release: meta.R ? Math.round((t0 - Date.parse(meta.R)) / 6000) / 10 : null,
       requested: !obs.refused,
       cache_status: obs.headers?.['x-cache-status'] ?? obs.headers?.['x-cache'] ?? null,
@@ -123,6 +198,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
       entry.outcome = `refused: ${obs.refused}`;
       target.last_result = entry.outcome;
       if (meta.key) target.release_checks[meta.key] = { outcome: entry.outcome, at: entry.at, requested: false };
+      if (meta.burst) meta.burst.trigger.done[meta.burst.off] = { outcome: entry.outcome, at: entry.at, requested: false };
       record(entry);
       store.save();
       return { ran: target.id, kind: meta.kind, refused: obs.refused };
@@ -143,7 +219,9 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
     });
     target.last_result = entry.outcome;
     if (meta.key) target.release_checks[meta.key] = { outcome: entry.outcome, at: entry.at, requested: true };
+    if (meta.burst) meta.burst.trigger.done[meta.burst.off] = { outcome: entry.outcome, at: entry.at, requested: true };
     record(entry);
+    internalTriggers(target, r, t0);
     store.save();
     return { ran: target.id, kind: meta.kind, observation: r.observation, changes: r.changes, notifications: r.notifications };
   }
@@ -166,21 +244,32 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
         return !by;
       });
 
-    // 1. Release-window checks: only for events with a known release time; never while backing off.
-    if (rw.enabled) {
+    // 1. Extra checks: release windows (known release times) and bursts (after a trigger), earliest slot first.
+    // Same safeguards for both: a shared per-site hourly allowance, the minimum gap, nothing while the site is
+    // backing off or paused, and a slot missed by more than the tolerance is logged rather than fired late.
+    if (rw.enabled || bc.enabled) {
+      const extras = [];
+      for (const x of live) {
+        if (rw.enabled) { const slot = dueSlot(x.target, t); if (slot) extras.push({ ...x, kind: 'release_window', slot, at: slot.at }); }
+        if (bc.enabled) { const slot = dueBurstSlot(x.target, t); if (slot) extras.push({ ...x, kind: 'burst', slot, at: slot.at }); }
+      }
+      extras.sort((a, b) => a.at - b.at);
       let wait = null;
-      for (const { target, c } of live) {
-        const slot = dueSlot(target, t);
-        if (!slot) continue;
+      for (const { target, c, kind, slot } of extras) {
         const h = db.sources[target.source];
         const skip = reason => {
-          target.release_checks[slot.key] = { outcome: 'skipped', at: iso(t) };
-          record({ at: iso(t), source: target.source, target_id: target.id, kind: 'release_window', release_at: slot.R, offset_minutes: slot.off, requested: false, outcome: `skipped: ${reason}` });
+          if (kind === 'release_window') {
+            target.release_checks[slot.key] = { outcome: 'skipped', at: iso(t) };
+            record({ at: iso(t), source: target.source, target_id: target.id, kind, release_at: slot.R, offset_minutes: slot.off, requested: false, outcome: `skipped: ${reason}` });
+          } else {
+            slot.trigger.done[slot.off] = { outcome: 'skipped', at: iso(t) };
+            record({ at: iso(t), source: target.source, target_id: target.id, kind, trigger_id: slot.trigger.id, trigger_type: slot.trigger.type, offset_minutes: slot.off, requested: false, outcome: `skipped: ${reason}` });
+          }
         };
         if ((h?.paused_until && Date.parse(h.paused_until) > t) || (h?.backoff_level ?? 0) > 0) { skip('site is backing off or paused'); continue; }
-        if (inLastHour(target.source, t, 'release_window') >= rw.maxExtraPerSitePerHour || inLastHour(target.source, t) >= siteCap()) { skip('per-site hourly budget reached'); continue; }
+        if (inLastHour(target.source, t, EXTRA) >= rw.maxExtraPerSitePerHour || inLastHour(target.source, t) >= siteCap()) { skip('per-site hourly budget reached'); continue; }
         if (!gapOk(target.source, t)) { wait = 'minimum gap between requests'; continue; } // retried next tick, within tolerance
-        return request(target, c, { kind: 'release_window', ...slot });
+        return request(target, c, kind === 'release_window' ? { kind, ...slot } : { kind, burst: slot });
       }
       if (wait) return { ran: null, reason: wait };
     }
@@ -218,6 +307,7 @@ export function createScheduler({ store, engine, config, now = () => Date.now(),
 
   return {
     addTarget,
+    addExternalTrigger,
     tick,
     start() {
       if (!config.scheduler.enabled || timer) return;
@@ -240,6 +330,15 @@ export function releaseReport(requestLog) {
     if (r.requested && r.changes?.length && w.first_change_minutes_after_release === null) w.first_change_minutes_after_release = r.minutes_after_release;
   }
   return [...windows.values()];
+}
+
+// Same event page: for /e/<id>/<slug> URLs the id decides (the slug can vary, e.g. in emails); otherwise the path.
+function sameEventPage(a, b) {
+  try {
+    const id = u => { const x = new URL(u); const m = x.pathname.match(/^\/e\/([a-z0-9]+)(\/|$)/i); return m ? x.host.replace(/^www\./, '') + '/e/' + m[1].toLowerCase() : null; };
+    const ia = id(a), ib = id(b);
+    return ia && ib ? ia === ib : samePage(a, b);
+  } catch { return false; }
 }
 
 function samePage(a, b) {

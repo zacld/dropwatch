@@ -1,6 +1,6 @@
 # Plan: faster Fatsoma detection
 
-Status: **Phases 1 and 2 built and tested** (13 Oct 2026); email test and bursts not started. Order agreed: (1) cover more per check, (2) check at the right
+Status: **Phases 1–4 built and tested** (13 Oct 2026). Remaining: automatic mailbox reading (needs your mailbox and Fatsoma sign-ups) and the live proof. Order agreed: (1) cover more per check, (2) check at the right
 moments, (4) test the email push, then (3) targeted bursts. Raising the baseline is a later decision, made only on
 evidence.
 
@@ -113,6 +113,26 @@ and back-off tests (each safeguard has a test that fails without it) pass; then 
 
 **Expected effect:** ~2–5 min after a signal; unannounced drops with no signal stay at the baseline (~30 min
 typical, ~1 h worst).
+
+### Phases 3 and 4 as built
+
+- Bursts (`DROPWATCH_SIGNAL_BURSTS`, off by default): internal triggers after a check finds a main tier sold out or a
+  count projected to sell out within 2 h (at most one falling-count trigger per watch per hour); checks at +2, +5,
+  +15 min. One active trigger per type per watch; per-trigger limit (default 4, ceiling 8).
+- Shared allowance: release windows and bursts together use `DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR` (4) per site, as
+  decided; back-off/pause, minimum gap, overlap guard and missed-slot logging unchanged.
+- External triggers: `POST /api/triggers` (`url`, `event_id`, or a raw `email`) and `cli.js trigger`; matched to the
+  watch that shows the event (organiser page while it lists it), by Fatsoma event id so slugs/tracking parameters in
+  email links do not matter; immediate check then +2, +5, +15. Unmatched or with bursts off: logged only.
+- Email reader (`monitor/sources/email.js`): decodes multipart, quoted-printable, base64 and encoded-word subjects;
+  extracts direct `fatsoma.com/e/<id>` links; tracking links are reported, never followed. **Unverified against a
+  real Fatsoma email.**
+- `trigger_log` (store schema 3), `cli.js trigger-report`.
+- Not built yet: reading a mailbox automatically. It needs the dedicated mailbox and Fatsoma sign-ups (yours to
+  create), and an IMAP client dependency (to be approved before install). Until then a saved `.eml` can be fed in
+  with `cli.js trigger --email`.
+- Tests: `test/monitor-bursts.test.js`; the shared allowance, per-trigger limit, one-active-trigger rule, falling
+  trigger rate limit and id-based matching each have a test that fails without them.
 
 ## Later, only on evidence: a higher baseline for chosen organisers
 

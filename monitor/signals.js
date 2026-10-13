@@ -62,7 +62,7 @@ export function eventSignals(ev, tiers, now, cfg) {
     const perHour = (first.qty - last.qty) / hours;
     const toZero = last.qty / perHour;
     if (toZero <= cfg.projectSellOutHours || last.qty <= cfg.lowStock) {
-      out.push({ type: 'falling_count', strength: STRENGTH.falling_count + (toZero <= 2 ? 0.5 : 0), reason: `"${t.name}" ${first.qty} → ${last.qty} left in ${hours.toFixed(1)} h (~${toZero.toFixed(1)} h to sell out)` });
+      out.push({ type: 'falling_count', strength: STRENGTH.falling_count + (toZero <= 2 ? 0.5 : 0), hours_to_zero: toZero, tier: t.name, reason: `"${t.name}" ${first.qty} → ${last.qty} left in ${hours.toFixed(1)} h (~${toZero.toFixed(1)} h to sell out)` });
     }
   }
 

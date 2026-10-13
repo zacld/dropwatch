@@ -52,6 +52,20 @@ export function releaseWindowConfig(env = process.env) {
   };
 }
 
+// Bursts: a few extra checks after a trigger (Phase 3 of docs/PLAN_FATSOMA_DETECTION.md). Internal triggers come
+// from the monitor's own observations (a main tier just sold out; a count projected to sell out soon); external
+// triggers come from outside (e.g. a platform email) and start with an immediate verification check. All extra
+// checks, bursts and release windows together, share DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR per site.
+export function burstConfig(env = process.env) {
+  return {
+    enabled: flag(env.DROPWATCH_SIGNAL_BURSTS, false),
+    offsetsMinutes: parseOffsets(env.DROPWATCH_BURST_OFFSETS_MINUTES, '2,5,15'),
+    externalOffsetsMinutes: parseOffsets(env.DROPWATCH_TRIGGER_OFFSETS_MINUTES, '0,2,5,15'),
+    maxChecksPerTrigger: clamp(num(env.DROPWATCH_BURST_MAX_CHECKS, 4), 0, 8),
+    fallingTriggerHours: clamp(num(env.DROPWATCH_BURST_FALLING_HOURS, 2), 0.5, 12),
+  };
+}
+
 export function loadConfig(env = process.env, overrides = {}) {
   const sources = {};
   for (const c of CONNECTORS) {
@@ -78,6 +92,7 @@ export function loadConfig(env = process.env, overrides = {}) {
     minRequestGapSeconds: Math.max(30, num(env.DROPWATCH_MIN_REQUEST_GAP_SECONDS, 60)),
     releaseWindow: releaseWindowConfig(env),
     signals: signalConfig(env),
+    bursts: burstConfig(env),
     ticketmasterApiKey: env.TICKETMASTER_API_KEY || null,
     devRoutes: flag(env.DROPWATCH_DEV_ROUTES, false),
     logLevel: env.DROPWATCH_LOG_LEVEL || 'info',
