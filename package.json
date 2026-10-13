@@ -18,7 +18,7 @@
     "monitor": "node monitor/index.js",
     "monitor:demo": "node scripts/monitor-demo.js",
     "monitor:cli": "node monitor/cli.js",
-    "test:monitor": "node --test test/monitor-parsers.test.js test/monitor-engine.test.js test/monitor-api.test.js"
+    "test:monitor": "node --test test/monitor-parsers.test.js test/monitor-engine.test.js test/monitor-api.test.js test/monitor-real.test.js"
   },
   "dependencies": {
     "playwright-core": "^1.63.0"

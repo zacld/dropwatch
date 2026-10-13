@@ -30,7 +30,10 @@ export function describeChange(c, ev, sourceName) {
   const tz = ev.timezone ?? 'Europe/London';
   const when = v => formatInZone(v, tz);
   switch (c.kind) {
-    case 'new_event': return `New on ${sourceName}: ${ev.title}${ev.venue_name ? `, ${ev.venue_name}` : ''}${ev.start_at ? `, ${when(ev.start_at)}` : ''}.`;
+    case 'new_event': {
+      const state = ev.cancellation_status && ev.cancellation_status !== 'scheduled' && ev.cancellation_status !== 'unknown' ? ` Listed as ${ev.cancellation_status}.` : '';
+      return `New on ${sourceName}: ${ev.title}${ev.venue_name ? `, ${ev.venue_name}` : ''}${ev.start_at ? `, ${when(ev.start_at)}` : ''}.${state}`;
+    }
     case 'on_sale_published': return `${sourceName} published a general sale time: ${when(c.current)}. Not on sale before then.`;
     case 'on_sale_changed': return `${sourceName} moved the published general sale time from ${when(c.previous)} to ${when(c.current)}.`;
     case 'presale_published': return `${sourceName} published a presale time: ${when(c.current)}.`;
@@ -89,14 +92,20 @@ export async function dispatchNotifications({ store, notifier, changes, events, 
       if (!fresh.length) continue;
       const sourceName = sourceNames[ev.source] ?? ev.source;
       const observedAt = fresh[0].observed_at;
-      const lines = fresh.map(c => describeChange(c, ev, sourceName));
+      // An event with a single ticket type reports the same fact twice (event status and tier status, event
+      // price and tier price). Say it once; both changes stay recorded and de-duplicated.
+      const singleTier = Object.values(db.tiers).filter(x => x.event_id === eventId && x.listed !== false && !x.addon).length === 1;
+      const shown = singleTier ? fresh.filter(c =>
+        !(c.kind === 'tier_status_changed' && fresh.some(o => o.kind === 'status_changed')) &&
+        !(c.kind === 'tier_price_changed' && fresh.some(o => o.kind === 'price_changed'))) : fresh;
+      const lines = shown.map(c => describeChange(c, ev, sourceName));
       const n = {
         id: store.nextId('ntf'),
         user_id: user.id,
         event_id: eventId,
         change_ids: fresh.map(c => c.id),
         kinds: [...new Set(fresh.map(c => c.kind))],
-        title: fresh.some(c => c.kind === 'new_event') ? `New: ${ev.title}` : `${ev.title}: ${fresh.length === 1 ? fresh[0].kind.replace(/_/g, ' ') : `${fresh.length} updates`}`,
+        title: shown.some(c => c.kind === 'new_event') ? `New: ${ev.title}` : `${ev.title}: ${shown.length === 1 ? shown[0].kind.replace(/_/g, ' ') : `${shown.length} updates`}`,
         lines,
         body: `${lines.join(' ')} Last observed ${formatInZone(observedAt, ev.timezone ?? 'Europe/London')} on ${sourceName}.${ev.data_origin === 'fixture' ? ' (Sample data.)' : ''}`,
         url: ev.canonical_url,
