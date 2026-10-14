@@ -25,6 +25,7 @@ export function jsonLd(html) {
   const nodes = [];
   const errors = [];
   scripts(html).filter(s => (s.attrs.type ?? '').toLowerCase() === 'application/ld+json').forEach((s, i) => {
+    if (!s.text.trim()) return; // empty placeholder (Fatsoma organiser pages render 12 of them): nothing to parse
     const { value, error } = tryJson(s.text);
     if (error) { errors.push(`json-ld block ${i}: ${error}`); return; }
     const walk = v => {
@@ -49,12 +50,15 @@ export function nextData(html) {
 }
 
 // Ember FastBoot shoebox: <script type="fastboot/shoebox" id="shoebox-...">{json}</script>
+// Real Fatsoma pages (observed 13 Oct 2026) serialise the document twice: the script holds a JSON string whose
+// content is the JSON:API document. Decode string layers until an object or array appears.
 export function shoebox(html) {
   const out = {};
   const errors = [];
   for (const s of scripts(html)) {
     if ((s.attrs.type ?? '').toLowerCase() !== 'fastboot/shoebox') continue;
-    const { value, error } = tryJson(s.text);
+    let { value, error } = tryJson(s.text);
+    for (let depth = 0; !error && typeof value === 'string' && depth < 3; depth++) ({ value, error } = tryJson(value));
     if (error) errors.push(`${s.attrs.id ?? 'shoebox'}: ${error}`);
     else out[s.attrs.id ?? `shoebox-${Object.keys(out).length}`] = value;
   }

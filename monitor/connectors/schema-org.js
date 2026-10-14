@@ -82,6 +82,7 @@ export function schemaEvent(node, { timezone = 'Europe/London', currency = null,
   }
   const priced = [];
   const tiers = [];
+  const seenIds = new Map();
   let curSeen = null;
   for (const o of offers) {
     const m = parseMoney(o.price ?? o.lowPrice, { currency: o.priceCurrency ?? currency });
@@ -94,8 +95,14 @@ export function schemaEvent(node, { timezone = 'Europe/London', currency = null,
       if (t.utc) release = t.utc; else warnings.push(`offer validFrom unparseable: "${o.validFrom}"`);
       if (t.assumedTimezone) warnings.push(`offer validFrom: no UTC offset published; interpreted in ${timezone}`);
     }
+    // Offers without an id (Skiddle's have none) get one from what identifies the ticket, never from its
+    // price or status: otherwise a price change looks like one tier removed and another added.
+    let tierId = String(o.sku ?? o['@id'] ?? o.identifier ?? `offer-${hashOf([o.name ?? '', o.url ?? '', o.category ?? '']).slice(0, 12)}`);
+    const n = seenIds.get(tierId) ?? 0;
+    seenIds.set(tierId, n + 1);
+    if (n) tierId = `${tierId}#${n + 1}`;
     tiers.push({
-      source_tier_id: String(o.sku ?? o['@id'] ?? o.identifier ?? `offer-${hashOf([o.name, o.price, o.url ?? '']).slice(0, 12)}`),
+      source_tier_id: tierId,
       name: o.name ?? 'Ticket',
       price: m.currency ? m.amount : null,
       currency: m.currency,

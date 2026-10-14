@@ -6,6 +6,7 @@ import { ROOT } from './config.js';
 import { createMonitorStore } from './store.js';
 import { createEngine } from './engine.js';
 import { createScheduler } from './scheduler.js';
+import { parseEmail, fatsomaEventLinks } from './sources/email.js';
 import { createLocalNotifier } from './notify.js';
 import { defaultPreferences, validatePreferences, matchEvent } from './preferences.js';
 import { fixtureObservation } from './retrieve.js';
@@ -132,6 +133,22 @@ export function createMonitorApp({ config, store, now = () => Date.now(), log = 
       if (!c) throw httpError(422, 'invalid', 'Unknown source.');
       if (!config.sources[c.id]?.live) throw httpError(409, 'live_off', `Live retrieval is off for ${c.name}.`);
       try { return { httpStatus: 201, body: scheduler.addTarget(body) }; } catch (e) { throw httpError(422, 'invalid', e.message); }
+    }],
+
+    // External triggers (e.g. platform emails): arm an immediate verification check of a watched event. They never
+    // alert by themselves. Body: { source, url | event_id, reason?, received_at? } or { source, email: <raw .eml> }.
+    ['GET', '/api/triggers', () => db.trigger_log ?? []],
+    ['POST', '/api/triggers', ({ body }) => {
+      const source = String(body.source ?? 'fatsoma');
+      if (!connectorById(source)) throw httpError(422, 'invalid', 'Unknown source.');
+      if (body.email) {
+        const email = parseEmail(String(body.email));
+        const links = fatsomaEventLinks(email);
+        const triggers = links.events.map(l => scheduler.addExternalTrigger({ source, url: l.url, via: 'email', reason: `email: ${email.subject.slice(0, 120)}`, received_at: email.date }));
+        return { httpStatus: 201, body: { email: { subject: email.subject, from: email.from, date: email.date }, events: links.events, unresolved_link_hosts: links.unresolved_link_hosts, triggers } };
+      }
+      if (!body.url && !body.event_id) throw httpError(422, 'invalid', 'Give url, event_id or email.');
+      return { httpStatus: 201, body: scheduler.addExternalTrigger({ source, url: body.url ?? null, event_id: body.event_id ?? null, reason: String(body.reason ?? 'manual trigger'), via: String(body.via ?? 'manual'), received_at: body.received_at ?? null }) };
     }],
 
     // Development only: load fixtures through the full pipeline.

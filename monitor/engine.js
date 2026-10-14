@@ -66,6 +66,10 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
 
     const observedMs = Date.parse(obsRec.observed_at);
     const staleOnArrival = t - observedMs > config.maxObservationAgeHours * HOUR;
+    // Ordering uses when the content was generated (CDN Age taken off) when the retriever knows it.
+    const asOf = observation.content_as_of && observation.content_as_of <= obsRec.observed_at ? observation.content_as_of : obsRec.observed_at;
+    obsRec.content_as_of = asOf;
+    const lastAsOf = p => p.last_content_as_of ?? p.last_successful_observation_at;
     const newChanges = [];
     const touched = [];
 
@@ -79,9 +83,11 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
 
       if (!prev && ev.uncertain_required.length) { entry.outcome = `rejected: ${ev.uncertain_required.join(', ')} uncertain and no earlier valid value`; continue; }
       if (prev && obsRec.observed_at < prev.last_successful_observation_at) { entry.outcome = 'out of order: older than the stored observation; ignored'; continue; }
+      if (prev && asOf < lastAsOf(prev)) { entry.outcome = `stale copy: content generated ${asOf}, older than the stored ${lastAsOf(prev)}; ignored`; continue; }
       if (prev && prev.content_hash === ev.content_hash) {
         prev.last_seen_at = obsRec.observed_at;
         prev.last_successful_observation_at = obsRec.observed_at;
+        prev.last_content_as_of = asOf;
         prev.observation_count = (prev.observation_count ?? 1) + 1;
         prev.data_origin = obsRec.origin;
         pushObs(prev, obsRec.id);
@@ -101,6 +107,7 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
         first_seen_at: prev?.first_seen_at ?? obsRec.observed_at,
         last_seen_at: obsRec.observed_at,
         last_successful_observation_at: obsRec.observed_at,
+        last_content_as_of: asOf,
         data_confidence: ev.confidence,
         source_payload_hash: result.payload_hash,
         content_hash: ev.content_hash,
@@ -118,7 +125,12 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
       const nextIds = new Set(ev.tiers.map(x => x.source_tier_id));
       for (const tier of ev.tiers) {
         const key = `${id}|${tier.source_tier_id}`;
-        db.tiers[key] = { ...tier, event_id: id, source: connector.id, listed: true, first_seen_at: db.tiers[key]?.first_seen_at ?? obsRec.observed_at, last_seen_at: obsRec.observed_at };
+        // Short history for signals: a point whenever status, remaining count or price changes.
+        const history = [...(db.tiers[key]?.history ?? [])];
+        const point = { at: obsRec.observed_at, status: tier.status, qty: tier.quantity?.value ?? null, price: tier.price };
+        const lastPt = history[history.length - 1];
+        if (!lastPt || lastPt.status !== point.status || lastPt.qty !== point.qty || lastPt.price !== point.price) history.push(point);
+        db.tiers[key] = { ...tier, event_id: id, source: connector.id, listed: true, first_seen_at: db.tiers[key]?.first_seen_at ?? obsRec.observed_at, last_seen_at: obsRec.observed_at, history: history.slice(-48) };
       }
       for (const p of prevTiers) if (!nextIds.has(p.source_tier_id)) Object.assign(db.tiers[`${id}|${p.source_tier_id}`], { listed: false, status_note: 'not listed in latest observation (not treated as sold out)' });
       db.quarantined[id] = ev.quarantined_tiers.map(q => ({ ...q, observed_at: obsRec.observed_at }));
@@ -126,7 +138,10 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
       const allDiffs = prev ? [...diffs, ...tierDiffs] : [{ field: '*', kind: 'new_event', previous: null, current: { title: record.title, start_at: record.start_at } }];
       for (const d of allDiffs) {
         const fieldState = d.field in (ev.field_states ?? {}) ? ev.field_states[d.field] : null;
-        const el = eligibility(d, { confidence: ev.confidence, minConfidence: config.minAlertConfidence, staleOnArrival, fieldState });
+        let el = eligibility(d, { confidence: ev.confidence, minConfidence: config.minAlertConfidence, staleOnArrival, fieldState });
+        // The first check of a newly added watch (e.g. an organiser page listing 12 events) records what is
+        // already there; only events that appear after it are announced as new.
+        if (observation.baseline && d.kind === 'new_event' && el.eligible) el = { eligible: false, reason: 'baseline: first check of a newly added watch' };
         newChanges.push({
           id: store.nextId('chg'),
           event_id: id,
@@ -134,6 +149,8 @@ export function createEngine({ store, config, notifier, now = () => Date.now(), 
           observation_id: obsRec.id,
           observed_at: obsRec.observed_at,
           detected_at: new Date(t).toISOString(),
+          // The change became visible after the previous valid observation and by this one.
+          appeared_after: prev?.last_successful_observation_at ?? null,
           ...d,
           confidence: ev.confidence,
           notify_eligible: el.eligible,

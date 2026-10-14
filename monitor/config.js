@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONNECTORS } from './connectors/index.js';
+import { signalConfig } from './signals.js';
 
 // Runtime configuration from environment variables (and .env, which never overrides the real environment).
 // See .env.example for every option.
@@ -22,6 +23,48 @@ const num = (v, fallback) => (v === undefined || v === '' || !Number.isFinite(Nu
 
 // Minimum polling intervals. Configuration can lengthen these, never shorten them.
 export const MIN_INTERVAL_MINUTES = { official_api: 30, public_html: 60, fixture_only: Infinity };
+
+// Release-window checks: a few extra requests around a KNOWN release time of a watched event. Each setting is
+// clamped to a hard ceiling so configuration can tune the allowance but never turn it into heavy polling.
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const parseOffsets = (raw, fallback) => {
+  const o = String(raw ?? fallback).split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n >= -60 && n <= 120);
+  return [...new Set(o.length ? o : fallback.split(',').map(Number))].sort((a, b) => a - b).slice(0, 8);
+};
+// Per-site defaults where a site's caching makes the generic +1 min check too early. Fatsoma pages may be served
+// from cache for up to ~2 min (max-age=60, stale-while-revalidate=59, observed 13 Oct 2026), so +2.
+const SOURCE_OFFSET_DEFAULTS = { fatsoma: '-2,2,5,15' };
+export function releaseWindowConfig(env = process.env) {
+  const offsetsBySource = {};
+  // Precedence: DROPWATCH_RELEASE_OFFSETS_<SITE>_MINUTES, then an explicit DROPWATCH_RELEASE_OFFSETS_MINUTES,
+  // then the site's built-in default, then the generic default.
+  for (const c of CONNECTORS) {
+    const raw = env[`DROPWATCH_RELEASE_OFFSETS_${envKey(c.id)}_MINUTES`] ?? env.DROPWATCH_RELEASE_OFFSETS_MINUTES;
+    if (raw !== undefined || SOURCE_OFFSET_DEFAULTS[c.id]) offsetsBySource[c.id] = parseOffsets(raw, SOURCE_OFFSET_DEFAULTS[c.id] ?? '-2,1,5,15');
+  }
+  return {
+    enabled: flag(env.DROPWATCH_RELEASE_WINDOW, false),
+    offsetsMinutes: parseOffsets(env.DROPWATCH_RELEASE_OFFSETS_MINUTES, '-2,1,5,15'),
+    offsetsBySource,
+    maxChecksPerRelease: clamp(num(env.DROPWATCH_RELEASE_MAX_CHECKS, 4), 0, 8),
+    maxExtraPerSitePerHour: clamp(num(env.DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR, 4), 0, 8),
+    slotToleranceMinutes: clamp(num(env.DROPWATCH_RELEASE_SLOT_TOLERANCE_MINUTES, 3), 1, 15),
+  };
+}
+
+// Bursts: a few extra checks after a trigger (Phase 3 of docs/PLAN_FATSOMA_DETECTION.md). Internal triggers come
+// from the monitor's own observations (a main tier just sold out; a count projected to sell out soon); external
+// triggers come from outside (e.g. a platform email) and start with an immediate verification check. All extra
+// checks, bursts and release windows together, share DROPWATCH_RELEASE_MAX_EXTRA_PER_HOUR per site.
+export function burstConfig(env = process.env) {
+  return {
+    enabled: flag(env.DROPWATCH_SIGNAL_BURSTS, false),
+    offsetsMinutes: parseOffsets(env.DROPWATCH_BURST_OFFSETS_MINUTES, '2,5,15'),
+    externalOffsetsMinutes: parseOffsets(env.DROPWATCH_TRIGGER_OFFSETS_MINUTES, '0,2,5,15'),
+    maxChecksPerTrigger: clamp(num(env.DROPWATCH_BURST_MAX_CHECKS, 4), 0, 8),
+    fallingTriggerHours: clamp(num(env.DROPWATCH_BURST_FALLING_HOURS, 2), 0.5, 12),
+  };
+}
 
 export function loadConfig(env = process.env, overrides = {}) {
   const sources = {};
@@ -45,6 +88,11 @@ export function loadConfig(env = process.env, overrides = {}) {
     maxResponseBytes: num(env.DROPWATCH_MAX_RESPONSE_BYTES, 5_000_000),
     userAgent: env.DROPWATCH_USER_AGENT || `DropwatchMonitor/0.1 (+${env.DROPWATCH_CONTACT || 'contact not configured'})`,
     scheduler: { enabled: flag(env.DROPWATCH_SCHEDULER, false), tickSeconds: Math.max(30, num(env.DROPWATCH_SCHEDULER_TICK_SECONDS, 60)) },
+    // Never two requests to the same site closer than this, whatever the schedule (floor 30 s).
+    minRequestGapSeconds: Math.max(30, num(env.DROPWATCH_MIN_REQUEST_GAP_SECONDS, 60)),
+    releaseWindow: releaseWindowConfig(env),
+    signals: signalConfig(env),
+    bursts: burstConfig(env),
     ticketmasterApiKey: env.TICKETMASTER_API_KEY || null,
     devRoutes: flag(env.DROPWATCH_DEV_ROUTES, false),
     logLevel: env.DROPWATCH_LOG_LEVEL || 'info',

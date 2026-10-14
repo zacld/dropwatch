@@ -40,6 +40,10 @@ node monitor/cli.js status
 and only if `DROPWATCH_LIVE_<SOURCE>=on` (off for every source by default; Resident Advisor is refused in code).
 Initialisation is automatic: the store file is created on first run and migrated when its schema version changes.
 
+**Continuous local monitoring:** see [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md) (start, restart, what
+persists, and why monitoring stops when the PC sleeps or the process exits). The roadmap is in
+[docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### How it fits together
 
 ```

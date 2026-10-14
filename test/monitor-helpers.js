@@ -28,8 +28,9 @@ export function setup({ users, configOverrides = {}, env = {} } = {}) {
   const notifier = { id: 'test', async send(n) { sent.push(n); return { delivered: true }; } };
   const engine = createEngine({ store, config, notifier, now: () => clock.t });
   for (const u of users ?? [{ ...defaultPreferences('u1') }]) store.data.users[u.id] = u;
-  // observe(file) ingests a fixture as if retrieved now (or at `at`).
-  const observe = (source, file, { at = clock.t, status = 200, body } = {}) =>
-    engine.ingest({ source, status, observed_at: iso(at), origin: 'fixture', body: body ?? fixture(file) });
+  // observe(file) ingests a fixture as if retrieved now (or at `at`). `contentAsOf` simulates a cached copy
+  // generated earlier than it was received (what retrieveLive derives from Date and Age headers).
+  const observe = (source, file, { at = clock.t, status = 200, body, target = null, contentAsOf } = {}) =>
+    engine.ingest({ source, target, status, observed_at: iso(at), origin: 'fixture', body: body ?? fixture(file), ...(contentAsOf === undefined ? {} : { content_as_of: iso(contentAsOf) }) });
   return { clock, config, store, db: store.data, engine, sent, observe };
 }

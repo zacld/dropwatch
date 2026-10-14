@@ -92,28 +92,31 @@ export function diffTiers(prevTiers, nextTiers) {
   const hadAny = prevTiers.length > 0;
   for (const t of nextTiers) {
     const p = prevById.get(t.source_tier_id);
+    const tag = d => diffs.push(t.addon ? { ...d, addon: true } : d);
     if (!p) {
-      if (hadAny) diffs.push({ field: `tier:${t.source_tier_id}`, kind: 'tier_added', previous: null, current: tierView(t), tier: t.name });
+      if (hadAny) tag({ field: `tier:${t.source_tier_id}`, kind: 'tier_added', previous: null, current: tierView(t), tier: t.name });
       continue;
     }
-    if (p.listed === false) diffs.push({ field: `tier:${t.source_tier_id}`, kind: 'tier_relisted', previous: null, current: tierView(t), tier: t.name });
-    if (p.status !== t.status && t.status !== 'unknown') diffs.push({ field: `tier:${t.source_tier_id}:status`, kind: 'tier_status_changed', previous: p.status, current: t.status, tier: t.name });
-    if (t.price !== null && p.price !== t.price) diffs.push({ field: `tier:${t.source_tier_id}:price`, kind: 'tier_price_changed', previous: p.price, current: t.price, tier: t.name, currency: t.currency });
-    if (t.release_at && p.release_at !== t.release_at) diffs.push({ field: `tier:${t.source_tier_id}:release_at`, kind: 'tier_release_changed', previous: p.release_at, current: t.release_at, tier: t.name });
+    if (p.listed === false) tag({ field: `tier:${t.source_tier_id}`, kind: 'tier_relisted', previous: null, current: tierView(t), tier: t.name });
+    if (p.status !== t.status && t.status !== 'unknown') tag({ field: `tier:${t.source_tier_id}:status`, kind: 'tier_status_changed', previous: p.status, current: t.status, tier: t.name });
+    if (t.price !== null && p.price !== t.price) tag({ field: `tier:${t.source_tier_id}:price`, kind: 'tier_price_changed', previous: p.price, current: t.price, tier: t.name, currency: t.currency });
+    if (t.fee != null && p.fee != null && p.fee !== t.fee) tag({ field: `tier:${t.source_tier_id}:fee`, kind: 'tier_fee_changed', previous: p.fee, current: t.fee, tier: t.name, currency: t.currency });
+    if (t.release_at && p.release_at !== t.release_at) tag({ field: `tier:${t.source_tier_id}:release_at`, kind: 'tier_release_changed', previous: p.release_at, current: t.release_at, tier: t.name });
   }
   for (const p of prevTiers) {
     if (!nextIds.has(p.source_tier_id) && p.listed !== false) {
-      diffs.push({ field: `tier:${p.source_tier_id}`, kind: 'tier_not_listed', previous: tierView(p), current: null, tier: p.name });
+      diffs.push({ field: `tier:${p.source_tier_id}`, kind: 'tier_not_listed', previous: tierView(p), current: null, tier: p.name, ...(p.addon ? { addon: true } : {}) });
     }
   }
   return diffs;
 }
 
-const tierView = t => ({ name: t.name, price: t.price, currency: t.currency, status: t.status, release_at: t.release_at });
+const tierView = t => ({ name: t.name, price: t.price, fee: t.fee ?? null, currency: t.currency, status: t.status, release_at: t.release_at, ...(t.addon ? { addon: true } : {}) });
 
 // Whether a change may be sent to users, and if not, why.
 export function eligibility(diff, { confidence, minConfidence, staleOnArrival, fieldState }) {
   if (!NOTIFY_GROUPS[diff.kind]) return { eligible: false, reason: 'change type is recorded but not alerted' };
+  if (diff.addon) return { eligible: false, reason: 'add-on, not a ticket for the event itself' };
   if (staleOnArrival) return { eligible: false, reason: 'observation was already stale when received' };
   if (confidence < minConfidence) return { eligible: false, reason: `confidence ${confidence} below ${minConfidence}` };
   if (fieldState && fieldState !== 'confirmed') return { eligible: false, reason: `field is ${fieldState}` };

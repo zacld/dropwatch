@@ -46,11 +46,20 @@ Code: `monitor/engine.js` (pipeline), `monitor/changes.js` (comparison), `monito
 | `presale_published`, `presale_changed` | `published_presale_at` | `presale` |
 | `cancellation` | `cancellation_status` (cancelled, postponed, rescheduled, moved online, reinstated) | `cancellation` |
 | `tier_added`, `tier_status_changed`, `tier_price_changed`, `tier_release_changed` | tiers | `tiers` |
-| `title_changed`, `end_time_changed`, `currency_changed`, `tier_not_listed`, `tier_relisted` | | recorded, not alerted |
+| `title_changed`, `end_time_changed`, `currency_changed`, `tier_not_listed`, `tier_relisted`, `tier_fee_changed` | | recorded, not alerted |
+| any tier change on an **add-on** (`addon: true`, e.g. Fatsoma extras sold with the event) | tiers | recorded, not alerted; add-ons never set event prices or availability |
+
+Tier identity must not depend on price or status. Offers without a source id (Skiddle JSON-LD) are keyed on
+name, URL and category, so a price change is `tier_price_changed`, never a removal plus an addition.
 
 ## De-duplication
 
 - **Observations**: an unchanged content hash records nothing new, so repeating an observation is harmless.
+- **Stale cached copies**: live retrieval records `content_as_of` (origin `Date` minus CDN `Age`). An
+  observation whose content is older than the stored one is ignored, so an out-of-date edge copy can't
+  replay as a "change back" (Skiddle pages are cached up to ~7 minutes).
+- **Within one alert**: a single-ticket event doesn't repeat the event-level and tier-level line for the same
+  status or price change; both changes stay recorded.
 - **Alerts**: each change in a notification has a key `user | subject | kind | field | new value`. A key
   that was sent within `DROPWATCH_ALERT_DEDUPE_HOURS` (default 24) is withheld and counted in `suppressed`.
   If a page flips between two states, the user is told once per window, not on every flip.

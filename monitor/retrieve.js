@@ -46,18 +46,28 @@ export async function retrieveLive(connector, target, config, { fetchImpl = fetc
       return { ...base, status: res.status, error: `redirected off-site to ${finalHost}` };
     }
     const text = await readLimited(res, config.maxResponseBytes);
-    return {
-      ...base,
-      observed_at: new Date(now()).toISOString(),
-      status: res.status,
-      headers: { 'content-type': res.headers.get('content-type'), 'retry-after': res.headers.get('retry-after') },
-      body: text,
-    };
+    const headers = {};
+    for (const h of ['content-type', 'retry-after', 'date', 'age', 'cache-control', 'etag', 'last-modified', 'x-cache', 'x-cache-status']) headers[h] = res.headers.get(h);
+    const observedAt = new Date(now()).toISOString();
+    return { ...base, observed_at: observedAt, content_as_of: contentAsOf(headers, observedAt), status: res.status, headers, body: text };
   } catch (e) {
     return { ...base, error: e?.message ?? String(e) };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// When the content was generated, as opposed to when we received it. CDN caches serve copies that are
+// minutes old (Skiddle, observed 13 Oct 2026: max-age=300, stale-while-revalidate=120, Age 166), and two
+// edges can disagree, so ordering by fetch time alone can replay an older copy as a "change back".
+// Uses the origin Date minus Age when both are present; otherwise the fetch time.
+export function contentAsOf(headers, observedAt) {
+  const date = Date.parse(headers?.date ?? '');
+  const age = Number(headers?.age);
+  const fetched = Date.parse(observedAt);
+  if (!Number.isFinite(date)) return Number.isFinite(age) && age >= 0 ? new Date(fetched - age * 1000).toISOString() : observedAt;
+  const generated = date - (Number.isFinite(age) && age >= 0 ? age * 1000 : 0);
+  return new Date(Math.min(generated, fetched)).toISOString();
 }
 
 async function readLimited(res, max) {

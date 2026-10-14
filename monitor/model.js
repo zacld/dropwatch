@@ -105,16 +105,26 @@ export function normaliseTier(raw, { eventCurrency } = {}) {
   if (price != null && !currency) { problems.push('tier price has no currency'); price = null; }
   const status = TIER_STATUS.includes(raw.status) ? raw.status : 'unknown';
   if (raw.status && status === 'unknown' && raw.status !== 'unknown') problems.push(`tier status "${raw.status}" not recognised`);
+  let fee = raw.fee ?? null;
+  if (fee != null && (typeof fee !== 'number' || !Number.isFinite(fee) || fee < 0)) { problems.push('tier fee invalid'); fee = null; }
+  const qty = raw.quantity_available;
   return {
     tier: {
       source_tier_id: String(raw.source_tier_id),
       name: normaliseText(raw.name) ?? 'Unnamed ticket',
       price: price == null ? null : round2(price),
+      fee: fee == null || price == null ? null : round2(fee),
       currency: currency && ISO_CURRENCY.test(currency) ? currency : null,
       release_at: raw.release_at && ISO_UTC.test(raw.release_at) ? raw.release_at : null,
+      off_sale_at: raw.off_sale_at && ISO_UTC.test(raw.off_sale_at) ? raw.off_sale_at : null,
       status,
-      // Quantities are never published by the observed sources; we do not invent them.
-      quantity: { state: 'unavailable', value: null },
+      presale: raw.presale === true ? true : raw.presale === false ? false : null,
+      // Add-ons (extras sold alongside the event's own tickets) are tracked but never drive event-level
+      // prices, availability or alerts.
+      addon: raw.addon === true,
+      access_code_only: raw.access_code_only === true,
+      // Only a source that publishes a count (Fatsoma "amount-available") supplies one; never invented.
+      quantity: Number.isInteger(qty) && qty >= 0 ? { state: 'confirmed', value: qty } : { state: 'unavailable', value: null },
     },
     problems,
   };

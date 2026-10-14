@@ -4,8 +4,8 @@ import { dirname } from 'node:path';
 // JSON file store for the monitor, following server/store.js: single process, synchronous saves.
 // `file: null` keeps everything in memory (tests). The schema is versioned; migrate() upgrades old files.
 
-export const SCHEMA_VERSION = 1;
-const LIMITS = { observations: 5000, changes: 10000, notifications: 5000 };
+export const SCHEMA_VERSION = 3;
+const LIMITS = { observations: 5000, changes: 10000, notifications: 5000, request_log: 5000, trigger_log: 2000 };
 
 export function emptyData() {
   return {
@@ -20,6 +20,8 @@ export function emptyData() {
     sources: {},         // source id → health record
     users: {},           // user id → preferences
     targets: [],         // live monitoring targets (scheduler)
+    request_log: [],     // every scheduled live request (normal and release-window), newest last
+    trigger_log: [],     // burst triggers, internal (sold out, falling count) and external (e.g. email), newest last
     seq: 1,
   };
 }
@@ -27,6 +29,10 @@ export function emptyData() {
 const MIGRATIONS = {
   // 0 → 1: files written before versioning had no quarantine map or suppressed counter.
   0: d => ({ ...emptyData(), ...d, quarantined: d.quarantined ?? {}, suppressed: d.suppressed ?? 0, schema_version: 1 }),
+  // 1 → 2: request log for the scheduler (release-window checks).
+  1: d => ({ ...d, request_log: d.request_log ?? [], schema_version: 2 }),
+  // 2 → 3: trigger log for bursts.
+  2: d => ({ ...d, trigger_log: d.trigger_log ?? [], schema_version: 3 }),
 };
 
 export function migrate(data) {
